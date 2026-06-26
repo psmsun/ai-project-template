@@ -43,7 +43,7 @@ Use the **recommended baseline for the chosen ecosystem** from `coding-standards
 > **The repo is non-empty** (it already has `.claude/`, `CLAUDE.md`, `README.md`, `templates/`). Most scaffolders refuse to run in a non-empty dir. Scaffold into a temp subdir (e.g. `_scaffold/`), then move its files up, letting the **template's** `CLAUDE.md`, `README.md`, `.gitignore`, and `.claude/` win on conflict; set the package `name` to the repo name. Delete `_scaffold/` after merging.
 
 - **TypeScript:** run the official scaffolder (`npm create vite@latest _scaffold -- --template react-ts`, `npx create-next-app@latest`, or `npx create-react-router@latest`), merge as above, then add baseline deps (zod; drizzle-orm + drizzle-kit + the chosen driver if a DB was selected; vitest; husky + lint-staged; **tailwind + shadcn** — install for any project with a UI, including a Vite React SPA; skip only for a headless library/CLI). See `coding-standards-guidance.md` → "TypeScript gotchas" for the **pnpm native-build approval**, the **`~/*` alias location**, and **husky v9** steps — getting these wrong silently breaks the build. Configure a pre-commit hook running typecheck + test.
-- **Python:** init with the chosen manager (`uv init` / `poetry new`), add baseline deps (pydantic, ruff, pytest), set up `src/` layout, and a `pre-commit` config running the type checker (mypy/pyright) + pytest.
+- **Python:** init **with a package/src layout** — `uv init --package --name <repo>` (bare `uv init` makes a flat `main.py`, not `src/<pkg>/`). Add deps: `uv add pydantic`; `uv add --dev ruff pytest mypy pre-commit`. Write a `.pre-commit-config.yaml` running **ruff + ruff-format + mypy + pytest**. See `coding-standards-guidance.md` → "Python gotchas" for the PEP 695 typing requirement, the mypy-hook `additional_dependencies`, and pytest src-layout config — getting these wrong fails lint/type-check on a fresh repo.
 
 ### 3. Resolve the `coding-standards` skill
 
@@ -94,7 +94,7 @@ If the user opted in (step 1.6):
 - Update `CLAUDE.md`: keep it tiny — point at the generated `coding-standards` skill.
 - Write `template.config.json` recording the chosen stack (copy `template.config.example.json`).
 - Fill the README "How to run" section with the project's real dev/test/build commands.
-- **Self-remove**: delete `.claude/skills/init-project/` and the `templates/` dir, then tell the user init is complete and summarize what was installed. (init must not run again.)
+- **Self-remove**: delete `.claude/skills/init-project/`, the `templates/` dir, and `template.config.example.json` (the real `template.config.json` stays). Then tell the user init is complete and summarize what was installed. (init must not run again.)
 
 ## Notes
 

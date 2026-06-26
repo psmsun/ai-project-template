@@ -115,6 +115,23 @@ standards are worse than none.
 - **Every service/module has matching `tests/` (`test_*.py`).** Test at the public boundary.
 - **ruff** governs style; don't hand-format. Keep functions small and named for intent.
 
+### Python gotchas (verified during init testing — these fail lint/type-check on a fresh repo)
+
+- **Use a package/src layout from the start:** `uv init --package --name <repo>`. Bare `uv init`
+  scaffolds a flat `main.py`, not `src/<pkg>/`, and you'd have to tear it down.
+- **PEP 695 generics are required once ruff `UP` rules are on (Python 3.12+, which `uv` pins).**
+  The old `Generic`/`TypeVar`/`Union[...]` style fails `ruff check` (`UP046`, `UP007`). Write the
+  Result type as: `class Ok[T]: ...`, `class Err: ...`, `type Result[T] = Ok[T] | Err`.
+- **Full dev dep set:** `uv add pydantic` (runtime); `uv add --dev ruff pytest mypy pre-commit`
+  (the type checker and pre-commit are easy to forget but the hook needs them).
+- **pre-commit runs ruff + ruff-format + mypy + pytest** (keep SKILL.md and this file in sync).
+- **mypy in pre-commit needs `additional_dependencies: [pydantic]`** under the `mirrors-mypy`
+  hook — it runs in an isolated venv and can't resolve pydantic under `--strict` otherwise
+  (even though `uv run mypy src` passes locally).
+- **pytest + src layout:** rely on the editable install (`uv run pytest`), or add
+  `[tool.pytest.ini_options]\npythonpath = ["src"]` to `pyproject.toml` as a safety net.
+- Unlike pnpm, **uv has no native-build approval step** — it's clean.
+
 ---
 
 ## Notes for the generator
