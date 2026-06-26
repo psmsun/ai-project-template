@@ -50,6 +50,10 @@ The template wires up this loop end-to-end:
 | 4. Build          | `do-work`                     | Plan → implement (TDD for core) → typecheck+test → commit.|
 | 5. Handoff        | `handoff`                     | Compact context for the next session/agent.              |
 
+Planning & verification (from `obra/superpowers`): `writing-plans` + `executing-plans` (plan and
+execute logical sprints with checkpoints) and `verification-before-completion` (run the checks and
+show output before claiming done).
+
 Supporting skills: `improve-codebase-architecture` (deepen shallow modules), `write-a-skill`
 (author new skills), `coding-standards` (generated, enforced throughout), plus `grill-me` for
 stress-testing plans.

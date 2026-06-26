@@ -65,6 +65,13 @@ skills). Confirm each (y/n), then:
 npx skills add mattpocock/skills -s <skill> --copy -y
 ```
 
+Also install the **planning & verification** skills from `obra/superpowers` (these complete what
+the cohort teaches — plan logical sprints, verify before claiming done), each y/n:
+
+```
+npx skills add obra/superpowers -s writing-plans -s executing-plans -s verification-before-completion --copy -y
+```
+
 `--copy` keeps `.claude/skills/<name>` self-contained; `-y` skips the CLI's own prompt (you
 already asked). This writes `skills-lock.json` (commit it). The CLI also creates `.agents/`
 (git-ignored mirror). The **vendored** skills (`do-work`, `prd-to-issues`,

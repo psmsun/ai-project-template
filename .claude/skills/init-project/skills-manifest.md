@@ -28,8 +28,25 @@ mirror, which is git-ignored.
 | `handoff`     | Compact context into a handoff doc for another agent.  |
 | `grill-me`    | Stress-test a plan/design by relentless questioning.   |
 
-Optional, also available remotely — offer if the user wants them (they overlap with / extend
-the vendored skills, so ask before installing to avoid duplicates):
+### Remote — planning & verification (`obra/superpowers`)
+
+These close the loop on what the cohort teaches about planning logical sprints and verifying
+before claiming done. Install with `npx skills add obra/superpowers -s <skill> --copy -y`.
+
+| Skill                          | Purpose in the workflow                                        |
+| ------------------------------ | ------------------------------------------------------------- |
+| `writing-plans`                | Turn a spec/sprint into a written, step-wise implementation plan. |
+| `executing-plans`              | Execute a written plan with review checkpoints between steps.  |
+| `verification-before-completion` | Run the checks and show output BEFORE claiming done/fixed/passing. |
+
+Also useful from the same repo (offer if relevant): `test-driven-development`,
+`requesting-code-review`, `systematic-debugging`, `subagent-driven-development`,
+`dispatching-parallel-agents`, `brainstorming`.
+
+### Remote — optional extras (`mattpocock/skills`)
+
+Offer if the user wants them (they overlap with / extend the vendored skills, so ask before
+installing to avoid duplicates):
 
 | Skill                          | Note                                                        |
 | ------------------------------ | ---------------------------------------------------------- |
