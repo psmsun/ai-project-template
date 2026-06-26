@@ -11,9 +11,20 @@ Read [coding-standards-guidance.md](coding-standards-guidance.md) and [skills-ma
 
 ## Workflow
 
+### 0. Get the interviewing skill first
+
+The stack decisions below benefit from being pressure-tested, not just collected. Before the
+interview, make `grill-me` available (it's a permanent workflow skill anyway, installed here
+rather than in step 4):
+
+- If `grill-me` is already installed (it may be global), use it.
+- Otherwise offer (y/n): `npx skills add mattpocock/skills -s grill-me --copy -y`.
+
 ### 1. Interview the stack (language first)
 
-Ask, one decision at a time:
+Conduct this as a light grilling — for each non-default choice, ask *why* and surface the
+trade-off (e.g. "Postgres over SQLite — do you need concurrent writes / a hosted DB, or is this
+local-first?"). Ask one decision at a time:
 
 1. **Language** — TypeScript or Python? (drives everything below)
 2. **TypeScript only:** framework — Vite (SPA/library), React Router v7, or Next.js (App Router)?
@@ -22,7 +33,8 @@ Ask, one decision at a time:
 5. **Deploy target** (optional) — note it for the README; no action required now.
 6. **Sandcastle** — set up the AFK autonomous runner now? If yes, Docker sandbox or no-sandbox?
 
-Record answers; you'll write them to `template.config.json` at the end.
+Record answers; you'll write them to `template.config.json` at the end. (Use `grill-me` again
+later when shaping the actual project plan/PRD — that's where it earns the most.)
 
 ### 2. Scaffold the toolchain (each step y/n)
 
@@ -43,7 +55,8 @@ This project needs its own `coding-standards` skill matching what was just insta
 ### 4. Install the remaining workflow skills (each y/n)
 
 Per [skills-manifest.md](skills-manifest.md): install the **remote** skills that have no vendored
-equivalent — by default `to-prd`, `handoff`, `grill-me`. Do **not** install `to-issues` by default
+equivalent — by default `to-prd`, `handoff` (`grill-me` was already installed in step 0). Do
+**not** install `to-issues` by default
 (the vendored `prd-to-issues` already fills that role; offer the swap only if the user prefers the
 remote one, and if they take it, remove the vendored `prd-to-issues` to avoid two overlapping
 skills). Confirm each (y/n), then:
