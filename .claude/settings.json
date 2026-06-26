@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo *)",
+      "Bash(gh label *)",
+      "Bash(gh issue *)",
+      "Bash(npx skills *)",
+      "Bash(npx @ai-hero/sandcastle *)"
+    ]
+  }
+}

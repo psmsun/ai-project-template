@@ -1,0 +1,16 @@
+{
+  "_comment": "Written by the init-project skill to record the chosen stack. Copy to template.config.json during init.",
+  "language": "typescript",
+  "framework": "react-router-v7",
+  "database": "sqlite",
+  "packageManager": "pnpm",
+  "deployTarget": null,
+  "sandcastle": {
+    "enabled": false,
+    "mode": "no-sandbox"
+  },
+  "codingStandards": {
+    "source": "generated",
+    "remoteSlug": null
+  }
+}

@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+
+# Build output
+dist/
+build/
+.next/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.local
+.sandcastle/.env
+
+# Sandcastle runtime
+.sandcastle/logs/
+.sandcastle/worktrees/
+
+# skills CLI generated mirror (canonical copies live in .claude/skills/; keep skills-lock.json tracked)
+.agents/
+
+# Project config written by init (keep template.config.example.json)
+template.config.json
+
+# OS / editor
+.DS_Store
