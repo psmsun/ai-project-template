@@ -42,6 +42,24 @@ projects (e.g. `MarkdownConverterV2` / markitdown Phase 0). Newest findings at t
   `<promise>NO MORE TASKS</promise>` — mismatch means it never detects "done" and burns all
   iterations. init should set `completionSignal` to match the prompt and pick a sensible
   maxIterations (e.g. derive from open AFK issue count, or default ~15).
+- [ ] **T11 — init generates INVALID pnpm-workspace.yaml.** It wrote `allowBuilds: { esbuild: true }`
+  (not a real pnpm key) and omitted the required `packages:` field, so `pnpm install` dies with
+  "packages field missing or empty". Plus a stray broken **root** `pnpm-workspace.yaml` with an
+  unfilled `set this to true or false` placeholder. Use the proven form:
+  `packages: [.]` + `onlyBuiltDependencies: [esbuild]`. Don't emit a root workspace file unless it's
+  actually a workspace.
+- [ ] **T12 — pnpm version pin mismatch breaks Docker.** init pinned `core` `packageManager` to
+  `pnpm@11.5.3` while the env had 9.12.3; the sandcastle Docker image (`corepack enable`) then tried
+  to download 11.5.3 and **aborted non-interactively**. init must pin to the *detected* pnpm, and the
+  generated Dockerfile should `corepack prepare pnpm@<v> --activate` + `ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0`.
+- [ ] **T13 — sandcastle install hook hangs on the purge prompt.** `onSandboxReady: cd core && pnpm install`
+  copies darwin `node_modules` into a linux container → pnpm wants to reinstall and **blocks on a
+  "remove node_modules?" prompt** (no TTY). The generated command must pass
+  `--config.confirmModulesPurge=false` (or set CI=true).
+- [ ] **T14 — husky hook blocks root-level commits.** core's `prepare: cd .. && husky core/.husky`
+  installs a pre-commit that runs lint-staged/pnpm assuming the `core` cwd; committing root-level files
+  (e.g. `.sandcastle/*`) fails with "packages field missing or empty". Scope the hook so root commits
+  don't trip it (or run lint-staged with the correct package dir).
 - [ ] **T8 — Generator self-check + modular-vs-monolithic guidance.** (a) After generating, verify the
   standards match what was installed (typecheck script exists, vitest `globals:true`, `~/*` in tsconfig
   AND bundler, dual-build tool for libs). (b) Apps → split reference files by layer (Matt's pattern);
