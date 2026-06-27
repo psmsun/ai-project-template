@@ -60,6 +60,14 @@ projects (e.g. `MarkdownConverterV2` / markitdown Phase 0). Newest findings at t
   installs a pre-commit that runs lint-staged/pnpm assuming the `core` cwd; committing root-level files
   (e.g. `.sandcastle/*`) fails with "packages field missing or empty". Scope the hook so root commits
   don't trip it (or run lint-staged with the correct package dir).
+- [ ] **T15 — AFK run closes issues without pushing the code (data-loss risk).** With
+  `branchStrategy: merge-to-head`, the agent commits locally + closes the GitHub issue, but nothing
+  pushes to origin — result: closed issues whose code is local-only (and lost entirely if the run
+  crashes before the end-merge). Minimum fix: `git push origin HEAD` after `run()` in `main.mts`
+  (done in this project). Better: don't mark an issue done until its code is on origin — prefer a
+  **PR-per-issue** model (agent pushes a branch + opens a PR "Closes #N"; the issue closes when the
+  PR merges), so "closed" and "code on remote" are atomic. init should wire push into the generated
+  runner by default.
 - [ ] **T8 — Generator self-check + modular-vs-monolithic guidance.** (a) After generating, verify the
   standards match what was installed (typecheck script exists, vitest `globals:true`, `~/*` in tsconfig
   AND bundler, dual-build tool for libs). (b) Apps → split reference files by layer (Matt's pattern);
