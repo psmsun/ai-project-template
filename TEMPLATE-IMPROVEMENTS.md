@@ -23,6 +23,18 @@ projects (e.g. `MarkdownConverterV2` / markitdown Phase 0). Newest findings at t
   directive and a final self-check that core/ + coding-standards exist and init-project is gone.
 - [ ] **T5 — (maybe) Trim coding-standards LLM cost.** Could ship a per-ecosystem skeleton the
   LLM only fills/prunes, instead of authoring from scratch. Evaluate token saving vs quality.
+- [ ] **T6 — First-class library section in coding-standards-guidance.** From the Matt-vs-generated
+  comparison (98% fidelity, but library support is just a scaffolder bullet today). Add: purity-rules
+  template (globals to ban + anti-patterns like `import fs`), contract-as-single-source-of-truth
+  (semver-major on change), golden/determinism/purity test templates, dual-build + `verbatimModuleSyntax`
+  note. Also note the Result pattern may be a typed error class (not only a discriminated union) for libs.
+- [ ] **T7 — Make generated standards example-driven.** The generated lib standards were correct but
+  prosier than Matt's, which pair every rule with a code example. Generator should emit short code
+  snippets (Result pattern, a vitest boundary-test setup, purity anti-pattern) — more actionable.
+- [ ] **T8 — Generator self-check + modular-vs-monolithic guidance.** (a) After generating, verify the
+  standards match what was installed (typecheck script exists, vitest `globals:true`, `~/*` in tsconfig
+  AND bundler, dual-build tool for libs). (b) Apps → split reference files by layer (Matt's pattern);
+  libraries → keep one SKILL.md < ~100 lines.
 
 ## DONE (shipped to template main)
 
