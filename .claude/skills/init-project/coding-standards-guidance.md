@@ -27,8 +27,13 @@ standards are worse than none.
 
 ### Recommended dependency baseline
 
-- **Scaffolder:** `npm create vite@latest` (SPA/lib) · `npx create-react-router@latest` ·
-  `npx create-next-app@latest` (App Router).
+- **Scaffolder:**
+  - *Headless library* (no UI, e.g. `@scope/core`): no React scaffolder — `pnpm init` +
+    `pnpm add -D typescript tsup vitest @types/node`, `tsup` for dual ESM+CJS builds
+    (`format: ["esm","cjs"]`, `dts: true`) so it imports in both browser and node. Add only the
+    libraries the package actually needs; no zod/drizzle/tailwind/shadcn by default.
+  - *App*: `npm create vite@latest` (SPA) · `npx create-react-router@latest` ·
+    `npx create-next-app@latest` (App Router).
 - **Validation:** `zod`.
 - **Database (if any):** `drizzle-orm` + `drizzle-kit` + driver — `better-sqlite3` (SQLite,
   default) or `pg`/`postgres` (Postgres).

@@ -1,8 +1,11 @@
 {
   "_comment": "Written by the init-project skill to record the chosen stack. Copy to template.config.json during init.",
   "language": "typescript",
-  "framework": "react-router-v7",
-  "database": "sqlite",
+  "projectType": "library",
+  "framework": "none",
+  "scaffoldLocation": "core/",
+  "skillLocation": "project",
+  "database": "none",
   "packageManager": "pnpm",
   "deployTarget": null,
   "sandcastle": {

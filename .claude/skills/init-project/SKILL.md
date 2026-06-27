@@ -11,14 +11,22 @@ Read [coding-standards-guidance.md](coding-standards-guidance.md) and [skills-ma
 
 ## Workflow
 
-### 0. Get the interviewing skill first
+### 0. Decide skill location, then get the interviewing skill
 
-The stack decisions below benefit from being pressure-tested, not just collected. Before the
-interview, make `grill-me` available (it's a permanent workflow skill anyway, installed here
-rather than in step 4):
+**Skill location (ask once, applies to all installs below).** Skills can live **in the project**
+(`.claude/skills/`, committed) or **globally** (`~/.claude/skills/`). Default to **in the project
+with `--copy`** — a self-contained repo travels to other machines and collaborators, and
+**sandcastle Docker runs only see repo-committed skills, not your global ones**. Global-only is
+lighter for solo local work but makes the repo non-portable. Recommend in-project; confirm with
+the user.
 
-- If `grill-me` is already installed (it may be global), use it.
-- Otherwise offer (y/n): `npx skills add mattpocock/skills -s grill-me --copy -y`.
+> Note: a skill already present **globally** still works in this project, so it won't *appear* in
+> `.claude/skills/`. If the user chose in-project, install it with `--copy` anyway (so it's
+> committed) even when a global copy exists — don't skip it just because it's globally available.
+
+Then make `grill-me` available first (the stack decisions benefit from being pressure-tested):
+install it now per the chosen location — `npx skills add mattpocock/skills -s grill-me --copy -y`
+(in-project), or rely on the global copy if the user chose global-only.
 
 ### 1. Interview the stack (language first)
 
@@ -27,11 +35,15 @@ trade-off (e.g. "Postgres over SQLite — do you need concurrent writes / a host
 local-first?"). Ask one decision at a time:
 
 1. **Language** — TypeScript or Python? (drives everything below)
-2. **TypeScript only:** framework — Vite (SPA/library), React Router v7, or Next.js (App Router)?
-3. **Database** — SQLite (default), Postgres, or none?
-4. **Package manager** — pnpm (default for TS) / npm / yarn; uv (default for Python) / poetry.
-5. **Deploy target** (optional) — note it for the README; no action required now.
-6. **Sandcastle** — set up the AFK autonomous runner now? If yes, Docker sandbox or no-sandbox?
+2. **Project type:**
+   - TypeScript: **headless library** (a pure package, no UI — e.g. `@scope/core`), **Vite React SPA**, **React Router v7**, or **Next.js (App Router)**.
+   - Python: **library/package**, **CLI**, or **service/API** (e.g. FastAPI).
+   A *headless library* gets NO framework, NO tailwind/shadcn — see the library scaffold in step 2.
+3. **Scaffold location** — repo **root**, or a **subfolder** (e.g. `core/`, `packages/<name>`)? Use a subfolder for a monorepo / multi-package repo where `.claude/` + `docs/` stay shared at the root. Default: root.
+4. **Database** — SQLite (default), Postgres, or none? (usually none for a headless library)
+5. **Package manager** — pnpm (default for TS) / npm / yarn; uv (default for Python) / poetry.
+6. **Deploy target** (optional) — note it for the README; no action required now.
+7. **Sandcastle** — set up the AFK autonomous runner now? If yes, Docker sandbox or no-sandbox?
 
 Record answers; you'll write them to `template.config.json` at the end. (Use `grill-me` again
 later when shaping the actual project plan/PRD — that's where it earns the most.)
@@ -40,9 +52,12 @@ later when shaping the actual project plan/PRD — that's where it earns the mos
 
 Use the **recommended baseline for the chosen ecosystem** from `coding-standards-guidance.md`. Prefer official scaffolders; then layer the baseline deps. Confirm each install (y/n).
 
-> **The repo is non-empty** (it already has `.claude/`, `CLAUDE.md`, `README.md`, `templates/`). Most scaffolders refuse to run in a non-empty dir. Scaffold into a temp subdir (e.g. `_scaffold/`), then move its files up, letting the **template's** `CLAUDE.md`, `README.md`, `.gitignore`, and `.claude/` win on conflict; set the package `name` to the repo name. Delete `_scaffold/` after merging.
+> **Where to scaffold (from step 1.3):**
+> - **Subfolder** (e.g. `core/`): create it and scaffold *inside* it — the package's `package.json`/`src/`/config live there; `.claude/` + `docs/` stay at the repo root. The subfolder may be empty, so a scaffolder can run in it directly (no `_scaffold/` dance). Set the package `name` to the subfolder/package name (e.g. `@scope/core`).
+> - **Root**: the repo root is **non-empty** (`.claude/`, `CLAUDE.md`, `README.md`, `templates/`), and most scaffolders refuse a non-empty dir. Scaffold into a temp `_scaffold/`, then move files up, letting the **template's** `CLAUDE.md`, `README.md`, `.gitignore`, `.claude/` win on conflict; delete `_scaffold/` after.
 
-- **TypeScript:** run the official scaffolder (`npm create vite@latest _scaffold -- --template react-ts`, `npx create-next-app@latest`, or `npx create-react-router@latest`), merge as above, then add baseline deps (zod; drizzle-orm + drizzle-kit + the chosen driver if a DB was selected; vitest; husky + lint-staged; **tailwind + shadcn** — install for any project with a UI, including a Vite React SPA; skip only for a headless library/CLI). See `coding-standards-guidance.md` → "TypeScript gotchas" for the **pnpm native-build approval**, the **`~/*` alias location**, and **husky v9** steps — getting these wrong silently breaks the build. Configure a pre-commit hook running typecheck + test.
+- **TypeScript — headless library** (no UI): do **not** run a React scaffolder. Set up a minimal package: `pnpm init`; `pnpm add -D typescript tsup vitest @types/node`; a `tsconfig.json` (strict, `~/*` alias); `tsup.config.ts` for **dual ESM+CJS builds** (`format: ["esm","cjs"]`, `dts: true`) so it imports cleanly in both browser and node clients; vitest config. Add only the libraries the package needs (e.g. conversion deps) — **no** zod/drizzle/tailwind/shadcn unless the design calls for them. husky + lint-staged with a pre-commit running typecheck + test.
+- **TypeScript — app** (Vite SPA / React Router / Next): run the official scaffolder (`npm create vite@latest _scaffold -- --template react-ts`, `npx create-next-app@latest`, or `npx create-react-router@latest`), merge per the root/subfolder note, then add baseline deps (zod; drizzle-orm + drizzle-kit + driver if a DB was chosen; vitest; husky + lint-staged; **tailwind + shadcn** for the UI). See `coding-standards-guidance.md` → "TypeScript gotchas" for the **pnpm native-build approval**, **`~/*` alias location**, and **husky v9** steps — getting these wrong silently breaks the build. Pre-commit runs typecheck + test.
 - **Python:** init **with a package/src layout** — `uv init --package --name <repo>` (bare `uv init` makes a flat `main.py`, not `src/<pkg>/`). Add deps: `uv add pydantic`; `uv add --dev ruff pytest mypy pre-commit`. Write a `.pre-commit-config.yaml` running **ruff + ruff-format + mypy + pytest**. See `coding-standards-guidance.md` → "Python gotchas" for the PEP 695 typing requirement, the mypy-hook `additional_dependencies`, and pytest src-layout config — getting these wrong fails lint/type-check on a fresh repo.
 
 ### 3. Resolve the `coding-standards` skill
@@ -72,8 +87,10 @@ the cohort teaches — plan logical sprints, verify before claiming done), each 
 npx skills add obra/superpowers -s writing-plans -s executing-plans -s verification-before-completion --copy -y
 ```
 
-`--copy` keeps `.claude/skills/<name>` self-contained; `-y` skips the CLI's own prompt (you
-already asked). This writes `skills-lock.json` (commit it). The CLI also creates `.agents/`
+Use `--copy` if the user chose **in-project** (step 0) — even for skills that already exist
+globally — so they're committed; omit the install entirely for skills the user wants **global-only**.
+`-y` skips the CLI's own prompt (you already asked). In-project installs write `skills-lock.json`
+(commit it). The CLI also creates `.agents/`
 (git-ignored mirror). The **vendored** skills (`do-work`, `prd-to-issues`,
 `improve-codebase-architecture`, `write-a-skill`, this one) already ship — leave them, and avoid
 installing their remote analogs (`tdd`/`implement`, `to-issues` vs `prd-to-issues`,
@@ -82,7 +99,7 @@ a later maintenance step (see README).
 
 ### 5. Optionally set up sandcastle
 
-If the user opted in (step 1.6):
+If the user opted in (step 1.7):
 
 1. `npx @ai-hero/sandcastle init` to scaffold `.sandcastle/`.
 2. Set the sandbox in `main.ts` / `interactive.ts`: `docker()` for sandboxed, or `noSandbox()` (import from `@ai-hero/sandcastle/sandboxes/no-sandbox`) for direct host execution.
