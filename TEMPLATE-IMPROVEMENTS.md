@@ -31,6 +31,17 @@ projects (e.g. `MarkdownConverterV2` / markitdown Phase 0). Newest findings at t
 - [ ] **T7 — Make generated standards example-driven.** The generated lib standards were correct but
   prosier than Matt's, which pair every rule with a code example. Generator should emit short code
   snippets (Result pattern, a vitest boundary-test setup, purity anti-pattern) — more actionable.
+- [ ] **T9 — Sandcastle runtime not installed by init.** init runs `npx @ai-hero/sandcastle init`
+  (scaffolds `.sandcastle/`) but never installs `@ai-hero/sandcastle` + `tsx` at the repo root, so
+  `npx tsx .sandcastle/main.mts` fails on the import. init must create/extend a root `package.json`
+  and `pnpm add -D @ai-hero/sandcastle tsx` (and ideally add a `sandcastle` script). (cf. sandcastle
+  issue #191.)
+- [ ] **T10 — Sandcastle config defaults wrong for a real backlog.** Generated `main.mts` has
+  `maxIterations: 3` (too low — a real backlog has 10+ issues) and **no `completionSignal`**, so it
+  defaults to `<promise>COMPLETE</promise>` while the generated `prompt.md` emits
+  `<promise>NO MORE TASKS</promise>` — mismatch means it never detects "done" and burns all
+  iterations. init should set `completionSignal` to match the prompt and pick a sensible
+  maxIterations (e.g. derive from open AFK issue count, or default ~15).
 - [ ] **T8 — Generator self-check + modular-vs-monolithic guidance.** (a) After generating, verify the
   standards match what was installed (typecheck script exists, vitest `globals:true`, `~/*` in tsconfig
   AND bundler, dual-build tool for libs). (b) Apps → split reference files by layer (Matt's pattern);
