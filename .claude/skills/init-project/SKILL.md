@@ -104,61 +104,53 @@ a later maintenance step (see README).
 
 ### 5. Optionally set up sandcastle
 
-If the user opted in (step 1.7). **The `@ai-hero/sandcastle` 0.10.0 scaffold is npm-oriented and
-broken out-of-the-box for a pnpm project** — you MUST apply every patch below or the first AFK run
-fails (verified end-to-end against a real run; each note says which failure it prevents). The doctor
-(`templates/sandcastle-doctor.mjs`) re-checks and auto-fixes most of these on every launch, but you
-apply them once here so the *first* run is clean.
+If the user opted in (step 1.7). The AFK model is **PR-per-issue (backlog A2 + A3)**: a host-driven
+loop picks one open issue → runs the agent on a per-issue branch → opens a PR `Closes #N` → a CI
+gate must go green → the runner merges it → the issue closes atomically. One bad PR stays open and
+the loop moves on. The `@ai-hero/sandcastle` 0.10.0 scaffold is npm-oriented and broken out-of-the-box
+for a pnpm project, so most of step 5 is **copying the validated template artifacts** rather than
+patching the scaffold. (All verified end-to-end against a real run.)
 
-1. **Install the runtime at the repo root** (the runner imports it; init's scaffolder does NOT
-   install it). Ensure a root `package.json` exists (`"type": "module"`, exact
-   `"packageManager": "pnpm@<detected-version>"` — NOT a range; for a root-scaffold library this is
-   the library's own package.json), then `pnpm add -D @ai-hero/sandcastle tsx`. Add a
-   `"sandcastle": "tsx .sandcastle/main.mts"` script.
-2. **Scaffold:** `npx @ai-hero/sandcastle init`. In a headless/non-TTY session it requires every flag
-   explicitly (it errors one at a time): `--agent claude-code --sandbox docker --issue-tracker
-   github-issues --template simple-loop --build-image false --create-label false`. (A human in a real
-   terminal gets interactive prompts instead.) 0.10.0 writes `main.ts` (not `main.mts`) — **rename it
-   to `.mts`** so the runtime + doctor + the `sandcastle` script all agree, and patch that file below.
-3. **Sandbox mode** in `main.mts`: `docker()` (sandboxed) or `noSandbox()` (import from
-   `@ai-hero/sandcastle/sandboxes/no-sandbox`, runs on host).
-4. **Fix `main.mts`** (the 0.10.0 defaults are wrong for a real pnpm backlog):
-   - `maxIterations` ≥ open-AFK-issue count (e.g. 15) — default 3 stops a third of the way.
-   - Add `completionSignal: "<promise>NO MORE TASKS</promise>"` to match the prompt (the scaffold
-     omits it; the default `<promise>COMPLETE</promise>` mismatches → never detects "done").
-   - **Replace the `onSandboxReady` hook** — the scaffold runs `npm install`, but this is a pnpm
-     project. Use a single resilient `sh -c` command (hooks run via `sh -c`):
-     `pnpm install --config.confirmModulesPurge=false || true; pnpm approve-builds --all || true; pnpm install --config.confirmModulesPurge=false`.
-     Why each piece: copied darwin `node_modules` reinstall for linux → pnpm blocks on a purge prompt
-     (`--config.confirmModulesPurge=false`); pnpm **exits non-zero** on un-approved native builds, so
-     the first install must tolerate it (`|| true`); `approve-builds` compiles esbuild; the final
-     install is the real exit gate (0). (With `allowBuilds` committed in step 6, the first install is
-     already clean — the approve step is a no-op safety net for any other native dep.)
-   - **Push after the run** so a closed issue always has its code on origin (merge-to-head merges
-     locally only): after `await run({...})`, add
-     `import { execSync } from "node:child_process";` and `execSync("git push origin HEAD", {stdio:"inherit"})`.
-5. **Fix the Dockerfile** — the 0.10.0 scaffold (`FROM node:22-bookworm`) installs **only npm**; a
+1. **Install the runtime at the repo root** (the runner imports it). Ensure a root `package.json`
+   exists (`"type": "module"`, exact `"packageManager": "pnpm@<detected-version>"` — NOT a range; for
+   a root-scaffold library this is the library's own package.json), then `pnpm add -D @ai-hero/sandcastle tsx`.
+   Add scripts `"sandcastle": "tsx .sandcastle/main.mts"` and `"sandcastle:doctor": "node .sandcastle/doctor.mjs"`.
+2. **Scaffold** (only for the Dockerfile + `.env.example`): `npx @ai-hero/sandcastle init`. In a
+   headless/non-TTY session it needs every flag (it errors one at a time): `--agent claude-code
+   --sandbox docker --issue-tracker github-issues --template simple-loop --build-image false
+   --create-label false`. Then **delete the scaffolded `.sandcastle/main.ts`** — you replace it next.
+3. **Copy the validated A2 artifacts** (don't hand-write these):
+   - `templates/sandcastle-main.mts` → `.sandcastle/main.mts` — the PR-per-issue loop. Set
+     `SC_PKG_DIR` via env if the package isn't root (`docker()` sandbox by default; for no-sandbox swap
+     to `noSandbox()`). It already runs the doctor pre-flight, the resilient pnpm install hook, and the
+     runner-enforced CI gate.
+   - `templates/sandcastle-prompt.md` → `.sandcastle/prompt.md` — the single-assigned-issue prompt
+     (the loop fills its `<<ISSUE_JSON>>` placeholder each iteration). Adjust the feedback-loop commands
+     to the project's real **pnpm** typecheck/test/build scripts.
+   - `templates/sandcastle-doctor.mjs` → `.sandcastle/doctor.mjs` — self-healing pre-flight.
+   - `templates/ci.yml` → `.github/workflows/ci.yml` — the CI gate (A3). For a subfolder package set
+     `defaults.run.working-directory`.
+4. **Fix the Dockerfile** — the 0.10.0 scaffold (`FROM node:22-bookworm`) installs **only npm**; a
    pnpm project needs pnpm in the container. While still root (before the `USER` switch) add
-   `ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0` and `RUN corepack enable && corepack prepare pnpm@<v> --activate`
-   (matching the detected pnpm; the env var stops corepack hanging on a non-TTY download).
-6. **Write a correct `pnpm-workspace.yaml`** in the package dir: pnpm 11.5.x **exits non-zero** until
+   `ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0` and `RUN corepack enable && corepack prepare pnpm@<v> --activate`.
+5. **Write a correct `pnpm-workspace.yaml`** in the package dir: pnpm 11.5.x **exits non-zero** until
    native builds are approved, and it honors the **`allowBuilds` MAP — not `onlyBuiltDependencies`**.
    Commit `packages: [.]` + `allowBuilds: { esbuild: true }` (add `better-sqlite3: true` etc. if used)
-   so every `pnpm install` is clean (exit 0) with no runtime churn (runtime churn here causes
-   merge-to-head conflicts). Delete any stray placeholder workspace file at the repo root.
-7. **Install the doctor** (self-healing pre-flight): copy `templates/sandcastle-doctor.mjs` →
-   `.sandcastle/doctor.mjs`. In `main.mts`, run it BEFORE `run()`:
-   `execSync("node .sandcastle/doctor.mjs", { stdio: "inherit", env: { ...process.env, SC_PKG_DIR: "<pkg dir>" } });`
-   (`SC_PKG_DIR` is `.` for a root scaffold, `core/` etc. for a subdir). It re-checks/auto-fixes the
-   runtime, packageManager pin, `allowBuilds`, Dockerfile pnpm, project-specific Docker image, and
-   `.env` on every launch, so the run cold-starts zero-touch on any machine. Also add a
-   `"sandcastle:doctor": "node .sandcastle/doctor.mjs"` script.
-8. Replace scaffolded `.sandcastle/prompt.md` with `templates/sandcastle-prompt.md`, adjusting the
-   feedback-loop commands to the project's real **pnpm** typecheck/test scripts (and the package subdir).
-9. Fill `.sandcastle/.env` from `.env.example` (`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`,
-   or `ANTHROPIC_API_KEY`; plus `GH_TOKEN` from `gh auth token`).
-10. Build the image: `npx @ai-hero/sandcastle docker build-image` (Docker mode only) — or just let
-    the doctor build it on first launch.
+   so every `pnpm install` is clean (exit 0) with no runtime churn. Delete any stray placeholder
+   workspace file at the repo root.
+6. Fill `.sandcastle/.env` from `.env.example` (`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`,
+   or `ANTHROPIC_API_KEY`; plus `GH_TOKEN` from `gh auth token`). The runner uses the **host's** gh +
+   git creds for PRs; the token in `.env` is for the agent inside the container.
+7. **Commit the baseline and push it to `main`.** PR-per-issue branches off `origin/main` and CI runs
+   from the workflow on `main`, so the scaffold (library + `.sandcastle/` + `.github/workflows/ci.yml`)
+   must be on `main` before the first run. Confirm the `ci` workflow goes green on that push.
+8. Build the image: `npx @ai-hero/sandcastle docker build-image` — or let the doctor build it on first launch.
+9. **Optional hardening — branch protection.** The runner is itself the CI gate (it merges only when
+   the PR's checks are green), so it works on any plan. If the repo is **public or on a paid plan**, also
+   add branch protection on `main` requiring the `ci` check + a PR (0 approvals) for defense-in-depth:
+   `gh api -X PUT repos/{owner}/{repo}/branches/main/protection` with
+   `{"required_status_checks":{"strict":true,"contexts":["ci"]},"enforce_admins":false,"required_pull_request_reviews":{"required_approving_review_count":0},"restrictions":null}`.
+   (On a **free private** repo this returns 403 — skip it; the runner gate still holds.)
 
 ### 6. Wire up and finalize
 

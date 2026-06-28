@@ -125,16 +125,30 @@ if (tryout("docker info") == null) {
   } else ok.push(`docker image present (${imgTag})`);
 }
 
-// 7. main file sanity (warn-only — sandcastle 0.10.0 scaffolds main.ts; older used main.mts).
+// 7. main file sanity (model-aware: A2 PR-per-issue loop, or legacy merge-to-head).
 const mainPath = [".sandcastle/main.mts", ".sandcastle/main.ts"].find(existsSync);
 if (mainPath) {
   const f = mainPath.split("/").pop();
   const m = readFileSync(mainPath, "utf8");
-  if (!/completionSignal/.test(m)) errors.push(`${f}: missing completionSignal (must match prompt's <promise>...)`);
-  if (!/confirmModulesPurge=false/.test(m)) errors.push(`${f}: install hook should pass --config.confirmModulesPurge=false`);
   if (/\bnpm install\b/.test(m) && !/pnpm install/.test(m)) errors.push(`${f}: onSandboxReady uses \`npm install\` but this is a pnpm project — use \`pnpm install\``);
-  if (!/git push/.test(m)) errors.push(`${f}: no post-run \`git push\` — closed issues won't reach origin`);
-  if (/maxIterations:\s*[1-3]\b/.test(m)) fixed.push(`${f}: maxIterations is low (<=3) — raise to >= open AFK issue count`);
+  if (!/confirmModulesPurge=false/.test(m)) errors.push(`${f}: install hook should pass --config.confirmModulesPurge=false`);
+  if (/gh pr create/.test(m)) {
+    // A2 PR-per-issue: host loop opens a PR per issue; one iteration per run, no completionSignal.
+    if (!/branchStrategy/.test(m)) errors.push(`${f}: PR-per-issue model needs a branchStrategy (commits land on a per-issue branch)`);
+    ok.push(`${f}: PR-per-issue (A2) model`);
+  } else {
+    // Legacy merge-to-head: needs a completionSignal, a post-run push, and enough iterations.
+    if (!/completionSignal/.test(m)) errors.push(`${f}: missing completionSignal (must match prompt's <promise>...)`);
+    if (!/git push/.test(m)) errors.push(`${f}: no post-run \`git push\` — closed issues won't reach origin`);
+    if (/maxIterations:\s*[1-3]\b/.test(m)) fixed.push(`${f}: maxIterations is low (<=3) — raise to >= open AFK issue count`);
+  }
+}
+
+// 7c. CI gate (A3): the PR-per-issue runner merges only when the `ci` check is green, so the
+//     workflow must exist (and be on main) for PRs to gate. Warn-only — can't auto-create reliably.
+if (mainPath && /gh pr create/.test(readFileSync(mainPath, "utf8"))) {
+  if (existsSync(".github/workflows/ci.yml")) ok.push("CI workflow present (.github/workflows/ci.yml)");
+  else errors.push("PR-per-issue needs a CI gate — copy templates/ci.yml → .github/workflows/ci.yml and push it to main");
 }
 
 // 7b. Dockerfile must set up the project's package manager (the 0.10.0 scaffold ships npm-only).
