@@ -10,8 +10,23 @@ CI gate → review-agent → auto-merge → loop-until-dry; HITL issues are hard
 
 - [~] **A1 — Zero-touch self-healing bootstrap.** `templates/sandcastle-doctor.mjs` checks + auto-fixes
   T9–T15 (runtime, pnpm pins, workspace, image, secrets) and runs pre-flight from `main.mts`.
-  *Done + validated against a real project (clean, idempotent).* **Still pending: a fresh clean-init
-  proof** — `gh repo create --template … && init` reaching a green sandcastle run with zero manual fixes.
+  **First fresh clean-init proof (base64-codec-demo, real Opus AFK run) surfaced gaps the template/doctor
+  did NOT cover — now fixed in this commit:**
+  - **GAP-2 (critical):** pnpm 11.5.x exits non-zero on `ERR_PNPM_IGNORED_BUILDS` and honors the
+    `allowBuilds` map, NOT `onlyBuiltDependencies` — the doctor's old rewrite was *backwards* and killed
+    the first run. Fixed: doctor writes `allowBuilds` + runs `approve-builds`; guidance/SKILL/skills corrected.
+  - **GAP-1:** tsup DTS build fails `TS5101 baseUrl` on TypeScript 6 → `ignoreDeprecations: "6.0"`.
+  - **GAP-4:** sandcastle 0.10.0 scaffold is npm-first (no pnpm in Dockerfile, `npm install` hook) →
+    SKILL step 5 rewritten; doctor asserts Dockerfile pnpm + flags `npm install` hooks.
+  - **GAP-3/5/6/7/9:** main.ts↔.mts, completionSignal slot, project-specific image grep, headless init
+    flags, vitest `.sandcastle/worktrees` exclude — all addressed.
+  - **GAP-8 (merge-to-head non-atomicity):** one failed merge aborts the run; "closed" issue's code can miss
+    `main`; runtime workspace churn caused the conflict (now removed by committing `allowBuilds`). **Structural
+    fix is A2 (PR-per-issue).**
+  - **✅ Re-run PASSED (base64-codec-zt, fixed template):** clean-init green with zero ad-hoc fixes; AFK run
+    built all 3 issues, 33 tests green, merged each to `main`, closed all 3, and pushed to origin — `WRAPPER_EXIT=0`.
+    GAP-8 did not recur (committed `allowBuilds` removed the churn). **A1 is proven** for the merge-to-head model;
+    A2 remains for atomic PR-per-issue robustness.
 - [ ] **A2 — PR-per-issue** (replace merge-to-head): agent pushes a branch + opens a PR "Closes #N";
   issue closes only when the PR merges → "closed" ⇔ "code on main" atomic, and a review surface.
 - [ ] **A3 — CI gate** (GitHub Actions): typecheck+test+build on each PR; branch protection blocks
