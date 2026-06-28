@@ -20,9 +20,10 @@ build/
 
 # skills CLI generated mirror (canonical copies live in .claude/skills/; keep skills-lock.json tracked)
 .agents/
+.factory/
 
-# Project config written by init (keep template.config.example.json)
-template.config.json
+# Note: template.config.json (the stack record written by init) IS committed so the repo is
+# self-describing — do not ignore it. Only template.config.example.json is removed by init.
 
 # OS / editor
 .DS_Store

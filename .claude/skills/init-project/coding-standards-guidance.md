@@ -80,12 +80,28 @@ standards are worse than none.
 
 ### TypeScript gotchas (verified during init testing — getting these wrong silently breaks the build)
 
-- **pnpm blocks native build scripts by default (pnpm 10/11).** `pnpm add better-sqlite3`
-  finishes with `ERR_PNPM_IGNORED_BUILDS` and the native module is never compiled — and
-  `pnpm rebuild` is gated too, so it does **not** fix it. The correct fix is to approve builds:
-  `pnpm approve-builds --all`, or add an allow-list. On pnpm 11 the allow-list lives in
-  **`pnpm-workspace.yaml`** (`onlyBuiltDependencies: [better-sqlite3]`) — the `pnpm` field in
-  `package.json` is **no longer read**. Verify with `node -e "new (require('better-sqlite3'))(':memory:')"`.
+- **pnpm blocks native build scripts by default, and `pnpm install` EXITS NON-ZERO until they're
+  approved (pnpm 11.5.x — verified).** `pnpm add esbuild`/`better-sqlite3` finishes with
+  `ERR_PNPM_IGNORED_BUILDS` **and exit code 1**, and the native module's postinstall never runs.
+  `pnpm rebuild` is gated too, so it does **not** fix it. **The mechanism pnpm 11.5.x actually
+  honors is the `allowBuilds` MAP in `pnpm-workspace.yaml`** — `pnpm approve-builds --all` writes it
+  (`allowBuilds:\n  esbuild: true`) and runs the postinstall. **`onlyBuiltDependencies` (a list) is
+  NOT honored in 11.5.x** — an install with it present still exits 1 and skips the build. So:
+  - Commit a `pnpm-workspace.yaml` with `packages: [.]` + `allowBuilds: { esbuild: true }` (add
+    `better-sqlite3: true` etc. if used) so installs are clean (exit 0) with no runtime churn.
+  - **Never make a bare `pnpm install` the exit-gating step of a hook/CI when native builds exist** —
+    it returns 1. Either commit the `allowBuilds` map, or chain `... || true; pnpm approve-builds --all`.
+  - The `pnpm` field in `package.json` is **not** read for this. Verify a native dep with e.g.
+    `node -e "new (require('better-sqlite3'))(':memory:')"`.
+  - This inverts older advice (`onlyBuiltDependencies`); it was correct for pnpm 10/early-11, but
+    11.5.x switched to interactive `approve-builds` + the `allowBuilds` map.
+- **tsup's DTS build fails on TypeScript 6.x with `TS5101: 'baseUrl' is deprecated`.** A headless
+  library scaffold (`pnpm add -D typescript tsup`) now pulls **typescript@6**, which turns the
+  `baseUrl` deprecation into a hard error. tsup's DTS step (rollup-plugin-dts) injects `baseUrl`
+  internally, so the build fails **even if your tsconfig has no baseUrl** (`tsc --noEmit` passes;
+  only the dual-build DTS step breaks). Fix: add **`"ignoreDeprecations": "6.0"`** to the library
+  `tsconfig.json` (forward-compatible; the error's own suggestion). Do not chase it by removing
+  `paths` — that isn't the cause.
 - **`~/*` path alias goes in the app tsconfig, not the root.** The Vite `react-ts` template makes
   `tsconfig.json` a project-references stub; put `paths` in **`tsconfig.app.json`** (and the bundler
   resolver, e.g. `vite-tsconfig-paths` or `resolve.alias`). Do **not** set `baseUrl` — TypeScript 6
@@ -94,10 +110,10 @@ standards are worse than none.
   It writes a default `.husky/pre-commit` you then overwrite with your typecheck + test commands.
 - **shadcn applies to a Vite React SPA too** — it's a UI project. Run `npx shadcn@latest init`.
   Skip tailwind/shadcn only for a headless library or CLI.
-- **`pnpm-workspace.yaml` must have a `packages:` field.** A workspace file with only
-  `onlyBuiltDependencies` (and no `packages:`) makes pnpm error "packages field missing or empty".
-  The build allow-list key is `onlyBuiltDependencies:` (a list) — `allowBuilds:` is NOT a real pnpm
-  key. Minimal valid file: `packages: [.]` + `onlyBuiltDependencies: [esbuild]`.
+- **`pnpm-workspace.yaml` must have a `packages:` field.** A workspace file without `packages:`
+  makes pnpm error "packages field missing or empty". The native-build approval lives in the same
+  file as the **`allowBuilds` map** (see the gotcha above — pnpm 11.5.x honors `allowBuilds`, not
+  `onlyBuiltDependencies`). Minimal correct file: `packages: [.]` + `allowBuilds: { esbuild: true }`.
 - **pin `packageManager` to the installed pnpm.** `pnpm init` may write a `devEngines` range
   (e.g. `pnpm@^11.5.3`) that corepack rejects; set an exact `"packageManager": "pnpm@<version>"`
   matching the version actually on the machine, and never pin a version the environment can't run.
@@ -178,3 +194,7 @@ When the project type is a library (e.g. `@scope/core`), the generated standards
   `typecheck`/`test` scripts exist; vitest `globals: true` (if used); `~/*` alias in BOTH tsconfig
   and the bundler/test resolver; dual-build tool present (libraries). Don't document a tool that
   isn't installed.
+- **vitest must exclude `.sandcastle/worktrees/`** (and `dist`). After an AFK run, preserved
+  worktrees each hold a copy of `src/*.test.ts`; without an `exclude`, host `pnpm test` scans them
+  and reports phantom failures. Generate `vitest.config.ts` with
+  `test.exclude: [...configDefaults.exclude, "**/.sandcastle/**", "dist/**"]`.

@@ -6,11 +6,13 @@
  * with ZERO manual intervention. Run it before launching: `node .sandcastle/doctor.mjs`
  * (or call it from main.mts before run()).
  *
- * Encodes the failures found while dogfooding the template (backlog T9–T15):
+ * Encodes the failures found while dogfooding the template (backlog T9–T15, A1):
  *   - sandcastle runtime not installed at root
  *   - packageManager pinned to a range / a version the env can't run
- *   - invalid pnpm-workspace.yaml (allowBuilds / missing packages field)
- *   - Docker image not built
+ *   - pnpm-workspace.yaml missing `packages:` or native builds not approved
+ *     (pnpm 11.5.x honors the `allowBuilds` map, NOT `onlyBuiltDependencies`)
+ *   - Dockerfile missing pnpm setup (the sandcastle 0.10.0 scaffold ships npm-only)
+ *   - Docker image not built (or a different project's image masking it)
  *   - missing .env secrets
  *
  * Config via env: SC_PKG_DIR (the package the agent builds; default "core").
@@ -64,19 +66,36 @@ for (const dep of ["@ai-hero/sandcastle", "tsx"]) {
   } else ok.push(`${dep} installed`);
 }
 
-// 4. Valid pnpm-workspace.yaml in the package dir (packages: field + onlyBuiltDependencies)
+// 4. pnpm-workspace.yaml: `packages:` field + native-build approval.
+//    VERIFIED on pnpm 11.5.x: `pnpm install` exits NON-ZERO on un-approved native build
+//    scripts (ERR_PNPM_IGNORED_BUILDS), and pnpm honors the `allowBuilds:` MAP (what
+//    `pnpm approve-builds` writes) — NOT `onlyBuiltDependencies` (a list pnpm 11.5.x ignores).
+//    So: ensure `allowBuilds: { <native>: true }` is committed (deterministic, churn-free), then
+//    run approve-builds to actually compile on this host. esbuild (tsup/vitest) always; better-sqlite3 if used.
 const wsPath = `${PKG_DIR}/pnpm-workspace.yaml`;
 if (existsSync(PKG_DIR)) {
-  const ws = existsSync(wsPath) ? readFileSync(wsPath, "utf8") : "";
-  const bad = !ws || /allowBuilds/.test(ws) || !/packages\s*:/.test(ws);
-  if (bad) {
+  const natives = ["esbuild"];
+  try {
+    const p = JSON.parse(readFileSync(`${PKG_DIR}/package.json`, "utf8"));
+    const deps = { ...p.dependencies, ...p.devDependencies };
+    if (deps["better-sqlite3"]) natives.push("better-sqlite3");
+  } catch {}
+  let ws = existsSync(wsPath) ? readFileSync(wsPath, "utf8") : "";
+  const hasPackages = /packages\s*:/.test(ws);
+  const missing = natives.filter((n) => !new RegExp(`^\\s*${n}\\s*:\\s*true`, "m").test(ws));
+  if (!ws || !hasPackages || missing.length || /onlyBuiltDependencies/.test(ws)) {
     writeFileSync(wsPath,
-      "# pnpm build-script allow-list (onlyBuiltDependencies, NOT allowBuilds).\n" +
-      "packages:\n  - .\n\nonlyBuiltDependencies:\n  - esbuild\n");
-    fixed.push(`rewrote ${wsPath} (was missing 'packages:' or used invalid 'allowBuilds')`);
-  } else ok.push(`${wsPath} valid`);
-  // stray root workspace file confuses pnpm
-  if (existsSync("pnpm-workspace.yaml") && !/packages\s*:/.test(readFileSync("pnpm-workspace.yaml", "utf8"))) {
+      "# pnpm build-script approval. pnpm 11.5.x honors the `allowBuilds` MAP (not the\n" +
+      "# `onlyBuiltDependencies` list), and `pnpm install` exits non-zero until native builds\n" +
+      "# are approved. Keep this committed so installs are clean (exit 0) with no runtime churn.\n" +
+      "packages:\n  - .\n\nallowBuilds:\n" + natives.map((n) => `  ${n}: true`).join("\n") + "\n");
+    fixed.push(`ensured ${wsPath} (packages: + allowBuilds for ${natives.join(", ")})`);
+  } else ok.push(`${wsPath} valid (allowBuilds: ${natives.join(", ")})`);
+  // Actually run any pending approved builds on this host (idempotent; no-op once compiled).
+  try { sh(`cd ${PKG_DIR} && pnpm approve-builds --all`); } catch {}
+  // stray root workspace file confuses pnpm (only when the package lives in a subdir)
+  if (PKG_DIR !== "." && existsSync("pnpm-workspace.yaml") &&
+      !/packages\s*:/.test(readFileSync("pnpm-workspace.yaml", "utf8"))) {
     execSync("rm -f pnpm-workspace.yaml"); fixed.push("removed stray/invalid root pnpm-workspace.yaml");
   }
 } else errors.push(`package dir '${PKG_DIR}' not found (set SC_PKG_DIR)`);
@@ -95,21 +114,35 @@ if (tryout("docker info") == null) {
   errors.push("Docker daemon not running — start Docker Desktop");
 } else {
   ok.push("docker daemon up");
-  const img = tryout(`docker images --format '{{.Repository}}:{{.Tag}}' | grep -i sandcastle`);
+  // Project-specific tag — sandcastle names the image `sandcastle:<repo-dir>` (lowercased).
+  // A loose `grep sandcastle` would match ANOTHER project's image and skip building this one.
+  const proj = (tryout("basename \"$PWD\"") || "").toLowerCase().replace(/[^a-z0-9._-]/g, "-");
+  const imgTag = `sandcastle:${proj}`;
+  const img = tryout(`docker images --format '{{.Repository}}:{{.Tag}}' | grep -ix '${imgTag}'`);
   if (!img) {
-    try { sh("npx @ai-hero/sandcastle docker build-image"); fixed.push("built sandcastle Docker image"); }
-    catch { errors.push("sandcastle image missing — run `npx @ai-hero/sandcastle docker build-image`"); }
-  } else ok.push(`docker image present (${img.split("\n")[0]})`);
+    try { sh("npx @ai-hero/sandcastle docker build-image"); fixed.push(`built sandcastle Docker image (${imgTag})`); }
+    catch { errors.push(`sandcastle image '${imgTag}' missing — run \`npx @ai-hero/sandcastle docker build-image\``); }
+  } else ok.push(`docker image present (${imgTag})`);
 }
 
-// 7. main.mts sanity (warn-only — these are correctness, not blockers to detect here)
-const mainPath = ".sandcastle/main.mts";
-if (existsSync(mainPath)) {
+// 7. main file sanity (warn-only — sandcastle 0.10.0 scaffolds main.ts; older used main.mts).
+const mainPath = [".sandcastle/main.mts", ".sandcastle/main.ts"].find(existsSync);
+if (mainPath) {
+  const f = mainPath.split("/").pop();
   const m = readFileSync(mainPath, "utf8");
-  if (!/completionSignal/.test(m)) errors.push("main.mts: missing completionSignal (must match prompt's <promise>...)");
-  if (!/confirmModulesPurge=false/.test(m)) errors.push("main.mts: install hook should pass --config.confirmModulesPurge=false");
-  if (!/git push/.test(m)) errors.push("main.mts: no post-run `git push` — closed issues won't reach origin");
-  if (/maxIterations:\s*[1-3]\b/.test(m)) fixed.push("main.mts: maxIterations is low (<=3) — raise to >= open AFK issue count");
+  if (!/completionSignal/.test(m)) errors.push(`${f}: missing completionSignal (must match prompt's <promise>...)`);
+  if (!/confirmModulesPurge=false/.test(m)) errors.push(`${f}: install hook should pass --config.confirmModulesPurge=false`);
+  if (/\bnpm install\b/.test(m) && !/pnpm install/.test(m)) errors.push(`${f}: onSandboxReady uses \`npm install\` but this is a pnpm project — use \`pnpm install\``);
+  if (!/git push/.test(m)) errors.push(`${f}: no post-run \`git push\` — closed issues won't reach origin`);
+  if (/maxIterations:\s*[1-3]\b/.test(m)) fixed.push(`${f}: maxIterations is low (<=3) — raise to >= open AFK issue count`);
+}
+
+// 7b. Dockerfile must set up the project's package manager (the 0.10.0 scaffold ships npm-only).
+if (existsSync(".sandcastle/Dockerfile")) {
+  const df = readFileSync(".sandcastle/Dockerfile", "utf8");
+  if (!/corepack (enable|prepare)/.test(df))
+    errors.push(".sandcastle/Dockerfile: no pnpm setup (add `corepack enable && corepack prepare pnpm@<v> --activate` + `ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0`)");
+  else ok.push("Dockerfile sets up pnpm (corepack)");
 }
 
 // Report
