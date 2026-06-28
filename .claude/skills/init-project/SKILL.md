@@ -129,11 +129,18 @@ verified against a real run; see notes for the failure each prevents.)
    field or pnpm errors "packages field missing or empty". For the package dir (e.g. `core/`):
    `packages: [.]` + `onlyBuiltDependencies: [esbuild]` (plus `better-sqlite3` etc. if used).
    Delete any stray placeholder workspace file at the repo root.
-7. Replace scaffolded `.sandcastle/prompt.md` with `templates/sandcastle-prompt.md`, adjusting the
+7. **Install the doctor** (self-healing pre-flight): copy `templates/sandcastle-doctor.mjs` →
+   `.sandcastle/doctor.mjs`. In `main.mts`, run it BEFORE `run()`:
+   `execSync("node .sandcastle/doctor.mjs", { stdio: "inherit" });` (set `SC_PKG_DIR` if the package
+   isn't `core/`). It re-checks and auto-fixes items 1–6 on every launch, so the run cold-starts
+   zero-touch even on another machine. Also add a `"sandcastle:doctor": "node .sandcastle/doctor.mjs"`
+   script. (Steps 1/4/5/6 above are the *first* application of these fixes; the doctor keeps them true.)
+8. Replace scaffolded `.sandcastle/prompt.md` with `templates/sandcastle-prompt.md`, adjusting the
    feedback-loop commands to the project's real typecheck/test scripts (and the package subdir).
-8. Fill `.sandcastle/.env` from `.env.example` (`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`,
+9. Fill `.sandcastle/.env` from `.env.example` (`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`,
    or `ANTHROPIC_API_KEY`; plus `GH_TOKEN`).
-9. Build the image: `npx @ai-hero/sandcastle docker build-image` (Docker mode only).
+10. Build the image: `npx @ai-hero/sandcastle docker build-image` (Docker mode only) — or just let
+    the doctor build it on first launch.
 
 ### 6. Wire up and finalize
 
