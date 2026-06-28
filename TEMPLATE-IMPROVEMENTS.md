@@ -27,10 +27,17 @@ CI gate → review-agent → auto-merge → loop-until-dry; HITL issues are hard
     built all 3 issues, 33 tests green, merged each to `main`, closed all 3, and pushed to origin — `WRAPPER_EXIT=0`.
     GAP-8 did not recur (committed `allowBuilds` removed the churn). **A1 is proven** for the merge-to-head model;
     A2 remains for atomic PR-per-issue robustness.
-- [ ] **A2 — PR-per-issue** (replace merge-to-head): agent pushes a branch + opens a PR "Closes #N";
-  issue closes only when the PR merges → "closed" ⇔ "code on main" atomic, and a review surface.
-- [ ] **A3 — CI gate** (GitHub Actions): typecheck+test+build on each PR; branch protection blocks
-  merge unless green. The agent then *cannot* land broken code unattended.
+- [x] **A2 — PR-per-issue** (replaces merge-to-head). `templates/sandcastle-main.mts` is a host-driven
+  loop: pick the next open AFK issue (priority label, then number) → run the agent on a per-issue branch
+  cut from `origin/main` → host pushes the branch + opens a PR `Closes #N` → CI gate → merge-on-green →
+  loop-until-dry. Issue closes **iff** the PR merges (atomic). One red/blocked PR stays open and the loop
+  continues — the merge-to-head "one bad merge aborts everything" failure (GAP-8) is gone by construction.
+  **Validated (base64-codec-a2):** 3 issues each → branch → PR → CI → merged → closed atomically, each
+  branching off the prior merge; plus a 1-issue confirm run. `WRAPPER_EXIT=0`.
+- [x] **A3 — CI gate** (`templates/ci.yml`, GitHub Actions): pnpm typecheck+test+build on every PR (and
+  `main`). **The runner enforces the gate** (polls the PR's checks, merges only when all green) so it works
+  on any plan; branch protection requiring the `ci` check is documented as optional hardening (it's a paid
+  feature on private repos — 403 on free). Verified green on every PR + main push in the A2 validation.
 - [ ] **A4 — Verification loop**: a `code-review` agent reviews each PR; real findings → a fix issue
   (next loop picks it up) instead of merging. Quality guardrail for unattended runs.
 - [ ] **A5 — Triggering**: scheduled cron (nightly) or GitHub Action on the `AFK` label; loop-until-dry

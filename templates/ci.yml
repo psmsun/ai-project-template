@@ -1,0 +1,47 @@
+# CI gate (backlog A3) — the required status check that branch protection holds PR merges on.
+# Runs the project's feedback loops on every PR (and on main). Keep the job id `ci` stable:
+# branch protection references it by the job's check name.
+#
+# For a subfolder package (e.g. core/), set `defaults.run.working-directory: core` and adjust
+# the actions/setup-node `cache-dependency-path`.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Enable pnpm via corepack and pin to the repo's packageManager. Disable the download
+      # prompt so a non-TTY runner never hangs.
+      - name: Enable pnpm
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # `allowBuilds` is committed in pnpm-workspace.yaml, so install is clean (exit 0) and
+      # compiles native deps (esbuild). The flag keeps a fresh runner non-interactive.
+      - name: Install
+        run: pnpm install --config.confirmModulesPurge=false
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
