@@ -3,6 +3,24 @@
 Running list of improvements to the ai-project-template, surfaced by dogfooding it on real
 projects (e.g. `MarkdownConverterV2` / markitdown Phase 0).
 
+## Epic: Toward complete AFK (human writes the PRD; system delivers tested, merged code)
+
+The loop: PRD (human) → prd-to-issues → **self-healing sandcastle run** → PR-per-issue →
+CI gate → review-agent → auto-merge → loop-until-dry; HITL issues are hard stops.
+
+- [~] **A1 — Zero-touch self-healing bootstrap.** `templates/sandcastle-doctor.mjs` checks + auto-fixes
+  T9–T15 (runtime, pnpm pins, workspace, image, secrets) and runs pre-flight from `main.mts`.
+  *Done + validated against a real project (clean, idempotent).* **Still pending: a fresh clean-init
+  proof** — `gh repo create --template … && init` reaching a green sandcastle run with zero manual fixes.
+- [ ] **A2 — PR-per-issue** (replace merge-to-head): agent pushes a branch + opens a PR "Closes #N";
+  issue closes only when the PR merges → "closed" ⇔ "code on main" atomic, and a review surface.
+- [ ] **A3 — CI gate** (GitHub Actions): typecheck+test+build on each PR; branch protection blocks
+  merge unless green. The agent then *cannot* land broken code unattended.
+- [ ] **A4 — Verification loop**: a `code-review` agent reviews each PR; real findings → a fix issue
+  (next loop picks it up) instead of merging. Quality guardrail for unattended runs.
+- [ ] **A5 — Triggering**: scheduled cron (nightly) or GitHub Action on the `AFK` label; loop-until-dry
+  with a budget cap. Removes the manual `npx tsx main.mts` launch.
+
 ## TODO
 
 - [ ] **T1 — Make init mostly deterministic (token/time win).** ~80% of `init-project` is
