@@ -11,9 +11,10 @@ Break a PRD into independently-grabbable GitHub issues using vertical slices (tr
 
 ### 1. Locate the PRD
 
-Ask the user for the PRD GitHub issue number (or URL).
+The PRD may be a **GitHub issue** or a **local file** (e.g. `docs/PRDs/*.md`):
 
-If the PRD is not already in your context window, fetch it with `gh issue view <number>` (with comments).
+- **GitHub issue:** ask for the number/URL; fetch with `gh issue view <number>` (with comments) if not already in context.
+- **Local file:** read it directly. Then **publish it as a GitHub issue first** (`gh issue create --title "PRD — ..." --body-file <path>`) so each slice can reference the real parent `#N` and sandcastle can track it. Note its number and use it as the parent below.
 
 ### 2. Explore the codebase (optional)
 

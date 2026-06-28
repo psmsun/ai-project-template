@@ -146,6 +146,22 @@ standards are worse than none.
 
 ---
 
+## Headless library projects (extra conventions)
+
+When the project type is a library (e.g. `@scope/core`), the generated standards should add:
+
+- **Purity rules.** Ban environment globals: no `window`/`document`/`chrome.*`/`fs`/`process` I/O
+  /`fetch`/`__dirname`. The public entry takes serializable input (e.g. `Uint8Array` + string),
+  never `File`/`Blob` or functions in options. The core never writes files — it returns a
+  descriptor and the client decides where bytes go. Include an anti-pattern: *don't* `import fs`.
+- **A single contract as source of truth.** Identify the public type (e.g. `Result<T,E>`,
+  `ApiResponse`, a domain `XxxResult`), document it as THE source of truth, and state that changing
+  it is **semver-major**. Pin its file path.
+- **Test categories** (not just "has tests"): golden-file (input → normalized snapshot),
+  contract (valid result shape), determinism (byte-identical across runs), purity (runs with
+  globals unavailable), harness. Dual ESM+CJS build with `.d.ts`/`.d.cts` (`verbatimModuleSyntax`
+  requires correct `import type`).
+
 ## Notes for the generator
 
 - The generated skill's `description` MUST include "Use when..." triggers (writing/reviewing
@@ -153,3 +169,12 @@ standards are worse than none.
   keep detail in the skill, not in always-on context.
 - Tailor every rule to what was actually installed. If the user declined a dependency, don't
   write standards that assume it.
+- **Be example-driven, not prose-only.** Pair each non-obvious rule with a SHORT code snippet
+  (the Result type, a minimal boundary test / `vi.mock` setup, a purity anti-pattern). Standards
+  with examples get followed; prose alone gets skimmed.
+- **App vs library structure:** for a full-stack **app**, split reference files by layer
+  (typescript / database / routes / frontend); for a **library/CLI**, keep one SKILL.md (< ~100 lines).
+- **Self-check after generating:** confirm the standards match what's installed —
+  `typecheck`/`test` scripts exist; vitest `globals: true` (if used); `~/*` alias in BOTH tsconfig
+  and the bundler/test resolver; dual-build tool present (libraries). Don't document a tool that
+  isn't installed.
