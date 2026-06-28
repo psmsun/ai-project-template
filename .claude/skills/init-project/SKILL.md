@@ -7,6 +7,8 @@ description: "Bootstrap a new project from this template: interview the stack, s
 
 Run this **once**, in a fresh copy of the template, before writing any application code. It is interactive — confirm each external install with the user **(y/n)**. Do not batch-install silently.
 
+**EXECUTE every step — actually run the commands and create the files; do not just describe the plan and stop.** Carry on through all six steps in one session until the self-check (step 6) passes. (Init has previously been *loaded* but not *run to completion* — don't repeat that.)
+
 Read [coding-standards-guidance.md](coding-standards-guidance.md) and [skills-manifest.md](skills-manifest.md) first — they are the source of truth for baselines and skill sources.
 
 ## Workflow
@@ -99,18 +101,49 @@ a later maintenance step (see README).
 
 ### 5. Optionally set up sandcastle
 
-If the user opted in (step 1.7):
+If the user opted in (step 1.7). **`npx @ai-hero/sandcastle init` scaffolds files that are
+broken out-of-the-box** — you MUST apply the patches below or the first AFK run fails. (All
+verified against a real run; see notes for the failure each prevents.)
 
-1. `npx @ai-hero/sandcastle init` to scaffold `.sandcastle/`.
-2. Set the sandbox in `main.ts` / `interactive.ts`: `docker()` for sandboxed, or `noSandbox()` (import from `@ai-hero/sandcastle/sandboxes/no-sandbox`) for direct host execution.
-3. Replace the scaffolded `.sandcastle/prompt.md` with `templates/sandcastle-prompt.md` from the template root, adjusting the feedback-loop commands to the project's actual typecheck/test scripts.
-4. Fill `.sandcastle/.env` from `.env.example` (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`, plus `GH_TOKEN`).
+1. **Install the runtime at the repo root** (the runner imports it; init's scaffolder does NOT
+   install it). Create a root `package.json` if absent (`"private": true`, `"type": "module"`,
+   detect pnpm and set `"packageManager": "pnpm@<detected-version>"` — NOT a range), then
+   `pnpm add -D @ai-hero/sandcastle tsx`. Add a `"sandcastle": "tsx .sandcastle/main.mts"` script.
+2. `npx @ai-hero/sandcastle init` to scaffold `.sandcastle/`.
+3. **Sandbox mode** in `main.mts`: `docker()` (sandboxed) or `noSandbox()` (import from
+   `@ai-hero/sandcastle/sandboxes/no-sandbox`, runs on host).
+4. **Fix `main.mts`** (the generated defaults are wrong for a real backlog):
+   - `maxIterations` ≥ open-AFK-issue count (e.g. 15) — default 3 stops a third of the way.
+   - Add `completionSignal: "<promise>NO MORE TASKS</promise>"` to match the prompt (default
+     `<promise>COMPLETE</promise>` mismatches → never detects "done", burns all iterations).
+   - Make the install hook non-interactive (copied darwin `node_modules` reinstalls for linux →
+     pnpm blocks on a purge prompt): `pnpm install --config.confirmModulesPurge=false`.
+   - **Push after the run** so a closed issue always has its code on origin (merge-to-head merges
+     locally only): after `await run({...})`, add
+     `import { execSync } from "node:child_process";` and `execSync("git push origin HEAD", {stdio:"inherit"})`.
+5. **Fix the Dockerfile** (corepack aborts non-interactively on a pnpm-version download):
+   align it to the detected pnpm — `RUN corepack enable && corepack prepare pnpm@<v> --activate`
+   and `ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0`.
+6. **Fix pnpm-workspace.yaml** if the scaffolder wrote an invalid one: the build allow-list key is
+   `onlyBuiltDependencies:` (a list), NOT `allowBuilds:`, and the file MUST include a `packages:`
+   field or pnpm errors "packages field missing or empty". For the package dir (e.g. `core/`):
+   `packages: [.]` + `onlyBuiltDependencies: [esbuild]` (plus `better-sqlite3` etc. if used).
+   Delete any stray placeholder workspace file at the repo root.
+7. Replace scaffolded `.sandcastle/prompt.md` with `templates/sandcastle-prompt.md`, adjusting the
+   feedback-loop commands to the project's real typecheck/test scripts (and the package subdir).
+8. Fill `.sandcastle/.env` from `.env.example` (`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`,
+   or `ANTHROPIC_API_KEY`; plus `GH_TOKEN`).
+9. Build the image: `npx @ai-hero/sandcastle docker build-image` (Docker mode only).
 
 ### 6. Wire up and finalize
 
 - Update `CLAUDE.md`: keep it tiny — point at the generated `coding-standards` skill.
 - Write `template.config.json` recording the chosen stack (copy `template.config.example.json`).
 - Fill the README "How to run" section with the project's real dev/test/build commands.
+- **Self-check before declaring done** (init has stalled mid-run before — verify, don't assume):
+  confirm the scaffold dir (e.g. `core/`) exists with `package.json`; `.claude/skills/coding-standards/`
+  exists; the chosen skills are installed; and the project's typecheck + test actually run green. If
+  any are missing, finish the remaining steps — do NOT report success.
 - **Self-remove**: delete `.claude/skills/init-project/`, the `templates/` dir, and `template.config.example.json` (the real `template.config.json` stays). Then tell the user init is complete and summarize what was installed. (init must not run again.)
 
 ## Notes

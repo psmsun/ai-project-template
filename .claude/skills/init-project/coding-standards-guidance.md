@@ -94,6 +94,13 @@ standards are worse than none.
   It writes a default `.husky/pre-commit` you then overwrite with your typecheck + test commands.
 - **shadcn applies to a Vite React SPA too** — it's a UI project. Run `npx shadcn@latest init`.
   Skip tailwind/shadcn only for a headless library or CLI.
+- **`pnpm-workspace.yaml` must have a `packages:` field.** A workspace file with only
+  `onlyBuiltDependencies` (and no `packages:`) makes pnpm error "packages field missing or empty".
+  The build allow-list key is `onlyBuiltDependencies:` (a list) — `allowBuilds:` is NOT a real pnpm
+  key. Minimal valid file: `packages: [.]` + `onlyBuiltDependencies: [esbuild]`.
+- **pin `packageManager` to the installed pnpm.** `pnpm init` may write a `devEngines` range
+  (e.g. `pnpm@^11.5.3`) that corepack rejects; set an exact `"packageManager": "pnpm@<version>"`
+  matching the version actually on the machine, and never pin a version the environment can't run.
 
 ---
 
