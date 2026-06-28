@@ -22,7 +22,11 @@ CI gate → review-agent → auto-merge → loop-until-dry; HITL issues are hard
     flags, vitest `.sandcastle/worktrees` exclude — all addressed.
   - **GAP-8 (merge-to-head non-atomicity):** one failed merge aborts the run; "closed" issue's code can miss
     `main`; runtime workspace churn caused the conflict (now removed by committing `allowBuilds`). **Structural
-    fix is A2 (PR-per-issue).** *Re-run after these fixes is the remaining gate before A1 is [x].*
+    fix is A2 (PR-per-issue).**
+  - **✅ Re-run PASSED (base64-codec-zt, fixed template):** clean-init green with zero ad-hoc fixes; AFK run
+    built all 3 issues, 33 tests green, merged each to `main`, closed all 3, and pushed to origin — `WRAPPER_EXIT=0`.
+    GAP-8 did not recur (committed `allowBuilds` removed the churn). **A1 is proven** for the merge-to-head model;
+    A2 remains for atomic PR-per-issue robustness.
 - [ ] **A2 — PR-per-issue** (replace merge-to-head): agent pushes a branch + opens a PR "Closes #N";
   issue closes only when the PR merges → "closed" ⇔ "code on main" atomic, and a review surface.
 - [ ] **A3 — CI gate** (GitHub Actions): typecheck+test+build on each PR; branch protection blocks
