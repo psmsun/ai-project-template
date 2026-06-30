@@ -11,3 +11,11 @@ Once initialized, all coding standards live in the `coding-standards` skill at
 
 **Load that skill** before writing code, reviewing changes, or answering questions about
 conventions.
+
+## Browser automation
+
+A sandboxed browser is available via the `dev-browser` CLI. Use it whenever a
+task needs to load a page, click, fill forms, screenshot, or verify rendered UI.
+
+- Run `dev-browser --help` first — its output is the full API + examples.
+- Headless (default, safe everywhere)

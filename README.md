@@ -10,6 +10,13 @@ workflow skills, and generates a `coding-standards` skill matched to what's actu
 
 ---
 
+## Prerequisites
+
+```bash
+npm install -g dev-browser
+dev-browser install
+```
+
 ## Start a new project
 
 Either:
