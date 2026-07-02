@@ -19,7 +19,7 @@ import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const PKG_DIR = process.env.SC_PKG_DIR || ".";
-const MODEL = process.env.SC_MODEL || "claude-opus-4-7";
+const MODEL = process.env.SC_MODEL || "claude-opus-4-8";
 const MAX_ISSUES = Number(process.env.SC_MAX_ISSUES || 20);
 const MERGE_TIMEOUT_S = Number(process.env.SC_MERGE_TIMEOUT_S || 600);
 

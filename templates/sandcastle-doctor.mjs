@@ -15,13 +15,13 @@
  *   - Docker image not built (or a different project's image masking it)
  *   - missing .env secrets
  *
- * Config via env: SC_PKG_DIR (the package the agent builds; default "core").
+ * Config via env: SC_PKG_DIR (the package the agent builds; default ".").
  * Exit code 0 = ready to run; non-zero = unresolved problems (printed).
  */
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const PKG_DIR = process.env.SC_PKG_DIR || "core";
+const PKG_DIR = process.env.SC_PKG_DIR || ".";
 const ok = [], fixed = [], errors = [];
 
 const sh = (c) => execSync(c, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
