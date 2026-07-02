@@ -26,6 +26,10 @@ jobs:
       - name: Install
         run: uv sync
 
+      # Fails the PR on known-vulnerable deps (org policy).
+      - name: Audit
+        run: uvx pip-audit --skip-editable
+
       - name: Lint
         run: uv run ruff check .
 

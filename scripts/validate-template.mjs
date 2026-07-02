@@ -34,10 +34,11 @@ for (const skill of readdirSync(skillsDir)) {
 }
 
 // 3. Every stack dir under templates/ carries the same required file roles.
+const STACKS = ["ts", "py"];
 const REQUIRED_TEMPLATE_FILES = ["ci.yml", "sandcastle-prompt.md", "sandcastle-doctor.mjs", "sandcastle-main.mts"];
-for (const stack of readdirSync("templates")) {
+for (const stack of STACKS) {
   const dir = join("templates", stack);
-  if (!statSync(dir).isDirectory()) continue;
+  if (!existsSync(dir)) { errors.push(`missing stack dir ${dir}`); continue; }
   for (const f of REQUIRED_TEMPLATE_FILES) {
     if (!existsSync(join(dir, f))) errors.push(`${dir}: missing required template file ${f}`);
   }
@@ -45,7 +46,7 @@ for (const stack of readdirSync("templates")) {
 }
 
 // 4. JS templates parse.
-for (const stack of readdirSync("templates")) {
+for (const stack of STACKS) {
   const f = join("templates", stack, "sandcastle-doctor.mjs");
   if (!existsSync(f)) continue; // absence already reported by check 3
   try { execSync(`node --check ${f}`, { stdio: "pipe" }); ok(`${f} parses`); }
@@ -64,15 +65,23 @@ try {
 // 6. init.mjs parses and its answers schema matches the config example exactly.
 try {
   execSync("node --check scripts/init.mjs", { stdio: "pipe" });
-  const { ANSWER_FIELDS } = await import(new URL("./init.mjs", import.meta.url));
+  const { ANSWER_FIELDS, STAMPED_FIELDS } = await import(new URL("./init.mjs", import.meta.url));
   const cfg = JSON.parse(readFileSync("template.config.example.json", "utf8"));
   for (const f of ANSWER_FIELDS) if (!(f in cfg)) errors.push(`init.mjs expects answers field '${f}' missing from template.config.example.json`);
+  const known = [...ANSWER_FIELDS, ...STAMPED_FIELDS];
   for (const f of Object.keys(cfg)) {
     if (f.startsWith("_")) continue; // _comment etc.
-    if (!ANSWER_FIELDS.includes(f)) errors.push(`template.config.example.json field '${f}' unknown to init.mjs ANSWER_FIELDS`);
+    if (!known.includes(f)) errors.push(`template.config.example.json field '${f}' unknown to init.mjs ANSWER_FIELDS/STAMPED_FIELDS`);
   }
   ok("scripts/init.mjs (parse + answers schema)");
 } catch (e) { errors.push(`scripts/init.mjs: ${e.message}`); }
+
+// 7. CHANGELOG: top entry must be a parseable version (init stamps it into generated projects).
+try {
+  const top = (readFileSync("CHANGELOG.md", "utf8").match(/^## \[([\d.]+)\]/m) || [])[1];
+  if (!top) errors.push("CHANGELOG.md: no '## [x.y.z]' entry at top — init cannot stamp templateVersion");
+  else ok(`CHANGELOG current version ${top}`);
+} catch { errors.push("CHANGELOG.md missing"); }
 
 if (errors.length) {
   console.error(`\nFAIL (${errors.length}):`);

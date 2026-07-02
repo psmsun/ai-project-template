@@ -26,6 +26,9 @@ export const ANSWER_FIELDS = [
   "language", "projectType", "framework", "scaffoldLocation", "skillLocation",
   "database", "packageManager", "deployTarget", "sandcastle", "codingStandards",
 ];
+// Written by finalize(), not asked in the interview.
+export const STAMPED_FIELDS = ["templateVersion", "templateCommit"];
+const ORG = "psmsun"; // CODEOWNERS / LICENSE owner
 
 const LANGUAGES = ["typescript", "python", "both"]; // both = web/ (TS) + api/ (Python), shared .claude/ + docs/
 const log = (m) => console.log(`\n[init] ${m}`);
@@ -430,9 +433,103 @@ function setupSandcastle(a) {
 }
 
 // ---------------------------------------------------------------- finalize + cleanup
+// Org overlay (Q3 answers): license, ownership, PR/issue templates, dependency scanning.
+function dropOrgFiles(a) {
+  const year = new Date().getFullYear();
+  if (!existsSync("LICENSE"))
+    writeFileSync("LICENSE",
+`Copyright (c) ${year} ${ORG}. All rights reserved.
+
+This software is proprietary. No license, express or implied, is granted to any
+party for any use, reproduction, modification, or distribution without prior
+written permission from the copyright holder.
+`);
+  mkdirSync(".github/ISSUE_TEMPLATE", { recursive: true });
+  if (!existsSync(".github/CODEOWNERS")) writeFileSync(".github/CODEOWNERS", `* @${ORG}\n`);
+  if (!existsSync(".github/pull_request_template.md"))
+    writeFileSync(".github/pull_request_template.md",
+`## What
+
+## Why
+
+## Verification
+
+- [ ] Feedback loops green locally (typecheck/lint + tests + build)
+- [ ] Closes #<issue>
+`);
+  if (!existsSync(".github/ISSUE_TEMPLATE/task.md"))
+    writeFileSync(".github/ISSUE_TEMPLATE/task.md",
+`---
+name: Task
+about: A vertical slice of work (tracer bullet)
+labels: []
+---
+
+## What to build
+
+## Acceptance criteria
+
+- [ ]
+
+## Blocked by
+
+None - can start immediately
+`);
+  // dependabot: ecosystems per stack + actions
+  const eco = [];
+  const npmDir = a.language === "both" ? "/web" : a.dir === "." ? "/" : `/${a.dir}`;
+  const pipDir = a.language === "both" ? "/api" : a.dir === "." ? "/" : `/${a.dir}`;
+  if (a.language !== "python") eco.push(`  - package-ecosystem: npm\n    directory: "${npmDir}"\n    schedule:\n      interval: weekly`);
+  if (a.language !== "typescript") eco.push(`  - package-ecosystem: uv\n    directory: "${pipDir}"\n    schedule:\n      interval: weekly`);
+  eco.push(`  - package-ecosystem: github-actions\n    directory: "/"\n    schedule:\n      interval: weekly`);
+  writeFileSync(".github/dependabot.yml", `version: 2\nupdates:\n${eco.join("\n")}\n`);
+  // CodeQL — requires a public repo or GitHub Advanced Security on private; delete if neither.
+  const langs = a.language === "both" ? ["javascript-typescript", "python"]
+    : a.language === "typescript" ? ["javascript-typescript"] : ["python"];
+  mkdirSync(".github/workflows", { recursive: true });
+  writeFileSync(".github/workflows/codeql.yml",
+`# CodeQL static analysis. NOTE: free on public repos; private repos need GitHub Advanced
+# Security — if this workflow errors with a licensing message, delete it.
+name: codeql
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 4 * * 1"
+permissions:
+  security-events: write
+  contents: read
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        language: [${langs.join(", ")}]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: \${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v3
+`);
+  log(`org overlay written (LICENSE proprietary/${ORG}, CODEOWNERS, PR/issue templates, dependabot, codeql).`);
+}
+
+function templateStamp() {
+  let version = null, commit = null;
+  try { version = (readFileSync("CHANGELOG.md", "utf8").match(/^## \[([\d.]+)\]/m) || [])[1] || null; } catch {}
+  try { commit = out("git rev-parse HEAD"); } catch {}
+  return { version, commit };
+}
+
 function finalize(a, answersPath) {
+  dropOrgFiles(a);
   const cfg = {};
   for (const f of ANSWER_FIELDS) cfg[f] = a[f];
+  const stamp = templateStamp();
+  cfg.templateVersion = stamp.version;
+  cfg.templateCommit = stamp.commit;
   writeJson("template.config.json", cfg);
 
   // README "How to run"
@@ -464,7 +561,7 @@ function selfCheck(a) {
 
 function cleanup(a, answersPath) {
   selfCheck(a);
-  for (const p of [".claude/skills/init-project", "templates", "template.config.example.json", "TEMPLATE-IMPROVEMENTS.md", answersPath, "scripts/init.mjs", "scripts/validate-template.mjs"]) {
+  for (const p of [".claude/skills/init-project", "templates", "template.config.example.json", "TEMPLATE-IMPROVEMENTS.md", "CHANGELOG.md", answersPath, "scripts/init.mjs", "scripts/validate-template.mjs"]) {
     rmSync(p, { recursive: true, force: true });
     log(`removed ${p}`);
   }

@@ -78,6 +78,17 @@ stress-testing plans.
 - `npx skills update` — refresh installed skills to their latest versions.
 - `npx skills experimental_install` — restore skills from the committed `skills-lock.json`.
 
+### Upgrading an existing project
+
+Init stamps `templateVersion` + `templateCommit` into your project's `template.config.json`.
+To pull template improvements into a project created earlier:
+
+1. Check `CHANGELOG.md` in this repo for what changed since your stamped version.
+2. Diff the relevant files against your stamped revision:
+   `git clone https://github.com/psmsun/ai-project-template && cd ai-project-template && git diff <templateCommit>..main -- templates/ .claude/skills/`
+3. Port what applies (usually `.sandcastle/` artifacts, `ci.yml`, and skills), then update the
+   stamp in `template.config.json` to the new version/commit.
+
 ## What ships in this template
 
 ```
