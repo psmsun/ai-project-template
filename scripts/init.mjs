@@ -293,7 +293,7 @@ function installSkills(a) {
 // ---------------------------------------------------------------- sandcastle
 function setupSandcastle(a) {
   if (!a.sandcastle?.enabled) return;
-  if (a.language !== "typescript") { log("sandcastle for Python lands with Phase 3a (#8) — skipping."); return; }
+  const stackDir = a.language === "typescript" ? "templates/ts" : "templates/py";
   const pnpmV = out("pnpm --version");
 
   // runtime at repo ROOT (the runner imports it from the root)
@@ -314,26 +314,30 @@ function setupSandcastle(a) {
   run(`npx -y @ai-hero/sandcastle init --agent claude-code --sandbox ${a.sandcastle.mode === "docker" ? "docker" : "none"} --issue-tracker github-issues --template simple-loop --build-image false --create-label false`, { allowFail: true });
   rmSync(".sandcastle/main.ts", { force: true }); // replaced by the validated A2 loop
 
-  copyFileSync("templates/ts/sandcastle-main.mts", ".sandcastle/main.mts");
-  copyFileSync("templates/ts/sandcastle-prompt.md", ".sandcastle/prompt.md");
-  copyFileSync("templates/ts/sandcastle-doctor.mjs", ".sandcastle/doctor.mjs");
+  copyFileSync(`${stackDir}/sandcastle-main.mts`, ".sandcastle/main.mts");
+  copyFileSync(`${stackDir}/sandcastle-prompt.md`, ".sandcastle/prompt.md");
+  copyFileSync(`${stackDir}/sandcastle-doctor.mjs`, ".sandcastle/doctor.mjs");
   mkdirSync(".github/workflows", { recursive: true });
-  let ci = readFileSync("templates/ts/ci.yml", "utf8");
+  let ci = readFileSync(`${stackDir}/ci.yml`, "utf8");
   if (a.dir !== ".") {
     ci = ci.replace("runs-on: ubuntu-latest", `runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: ${a.dir}`);
   }
   writeFileSync(".github/workflows/ci.yml", ci);
 
-  // 0.10.0 scaffold ships an npm-only Dockerfile; a pnpm project needs pnpm in the container.
+  // 0.10.0 scaffold ships an npm-only Dockerfile; the container needs the project's real toolchain.
   if (a.sandcastle.mode === "docker" && existsSync(".sandcastle/Dockerfile")) {
     let df = readFileSync(".sandcastle/Dockerfile", "utf8");
-    if (!df.includes("corepack prepare pnpm")) {
-      const pnpmSetup = `ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0\nRUN corepack enable && corepack prepare pnpm@${pnpmV} --activate\n`;
-      df = df.includes("\nUSER ") ? df.replace(/\nUSER /, `\n${pnpmSetup}\nUSER `) : df + `\n${pnpmSetup}`;
+    const setup = a.language === "typescript"
+      ? (df.includes("corepack prepare pnpm") ? null
+        : `ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0\nRUN corepack enable && corepack prepare pnpm@${pnpmV} --activate\n`)
+      : (/astral-sh\/uv/.test(df) ? null
+        : `COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/\n`);
+    if (setup) {
+      df = df.includes("\nUSER ") ? df.replace(/\nUSER /, `\n${setup}\nUSER `) : df + `\n${setup}`;
       writeFileSync(".sandcastle/Dockerfile", df);
     }
     df = readFileSync(".sandcastle/Dockerfile", "utf8");
-    if (/npm install/.test(df)) log("WARNING: .sandcastle/Dockerfile still contains an `npm install` hook — replace with pnpm.");
+    if (/npm install/.test(df)) log("WARNING: .sandcastle/Dockerfile still contains an `npm install` hook — replace with the project's package manager.");
   }
   log("sandcastle wired. REMAINING (secrets, can't be scripted): fill .sandcastle/.env — CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`) or ANTHROPIC_API_KEY, plus GH_TOKEN (`gh auth token`). Build the image with `npx @ai-hero/sandcastle docker build-image` or let the doctor do it.");
 }
