@@ -27,7 +27,7 @@ export const ANSWER_FIELDS = [
   "database", "packageManager", "deployTarget", "sandcastle", "codingStandards",
 ];
 
-const LANGUAGES = ["typescript", "python"]; // "both" lands with Phase 3b (#9)
+const LANGUAGES = ["typescript", "python", "both"]; // both = web/ (TS) + api/ (Python), shared .claude/ + docs/
 const log = (m) => console.log(`\n[init] ${m}`);
 const die = (m) => { console.error(`\n[init] FATAL: ${m}`); process.exit(1); };
 
@@ -46,11 +46,13 @@ function loadAnswers(path) {
   if (!path || !existsSync(path)) die(`answers file not found: ${path}\nusage: node scripts/init.mjs <answers.json> [--cleanup]`);
   const a = readJson(path);
   for (const f of ANSWER_FIELDS) if (!(f in a)) die(`answers missing field: ${f}`);
-  if (!LANGUAGES.includes(a.language)) die(`language must be one of ${LANGUAGES.join("/")} (mixed-stack "both" is Phase 3b)`);
+  if (!LANGUAGES.includes(a.language)) die(`language must be one of ${LANGUAGES.join("/")}`);
   if (a.language === "typescript" && a.packageManager !== "pnpm")
     die(`only pnpm is encoded for TypeScript (answers say ${a.packageManager}); npm/yarn need the manual SKILL path`);
   if (a.language === "python" && a.packageManager !== "uv")
     die(`only uv is encoded for Python (answers say ${a.packageManager})`);
+  if (a.language === "both" && a.packageManager !== "pnpm+uv")
+    die(`mixed-stack projects use packageManager "pnpm+uv" (answers say ${a.packageManager})`);
   a.dir = a.scaffoldLocation && a.scaffoldLocation !== "." ? a.scaffoldLocation : ".";
   return a;
 }
@@ -192,9 +194,22 @@ function scaffoldTsApp(a) {
   const at = (f) => join(dir, f);
   const pkg = readJson(at("package.json"));
   pkg.packageManager = `pnpm@${pnpmV}`;
-  pkg.scripts = { typecheck: "tsc --noEmit", ...pkg.scripts, prepare: "husky" };
+  // Vite's react-ts template makes tsconfig.json a project-references stub — `tsc -b` is the
+  // correct whole-project typecheck there; plain --noEmit only for single-tsconfig setups.
+  const typecheck = existsSync(at("tsconfig.app.json")) ? "tsc -b" : "tsc --noEmit";
+  pkg.scripts = { typecheck, ...pkg.scripts };
+  if (!a.skipHooks) pkg.scripts.prepare = "husky";
   if (pkg.scripts.test === undefined || /no test specified/.test(pkg.scripts.test || "")) pkg.scripts.test = "vitest run";
   writeJson(at("package.json"), pkg);
+  // vitest exits non-zero with zero test files — ship a smoke test so `pnpm test` is green from commit one
+  if (!existsSync(at("src/smoke.test.ts")))
+    writeFileSync(at("src/smoke.test.ts"),
+`import { test, expect } from "vitest";
+
+test("smoke", () => {
+  expect(1 + 1).toBe(2);
+});
+`);
 
   const builds = ["esbuild"];
   if (a.database === "sqlite") builds.push("better-sqlite3");
@@ -211,8 +226,10 @@ function scaffoldTsApp(a) {
   tc.compilerOptions = { ...tc.compilerOptions, paths: { "~/*": ["./src/*"] } };
   writeJson(appTc, tc);
 
-  run(`pnpm exec husky init`, { cwd: dir });
-  writeFileSync(at(".husky/pre-commit"), `pnpm run typecheck && pnpm run test\n`);
+  if (!a.skipHooks) {
+    run(`pnpm exec husky init`, { cwd: dir });
+    writeFileSync(at(".husky/pre-commit"), `pnpm run typecheck && pnpm run test\n`);
+  }
   run(`pnpm approve-builds --all`, { cwd: dir, allowFail: true });
   log(`NOTE: tailwind + shadcn for ${a.framework}: run \`npx shadcn@latest init\` interactively if the design needs it (UI choice, not mechanical).`);
 }
@@ -243,7 +260,7 @@ extend-select = ["UP", "I"]
 [tool.mypy]
 strict = true
 `);
-  writeFileSync(at(".pre-commit-config.yaml"),
+  if (!a.skipHooks) writeFileSync(at(".pre-commit-config.yaml"),
 `repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.4
@@ -276,7 +293,59 @@ strict = true
 def test_package_imports() -> None:
     assert pkg_name
 `);
-  run(`uv run pre-commit install`, { cwd: dir, allowFail: true });
+  if (!a.skipHooks) run(`uv run pre-commit install`, { cwd: dir, allowFail: true });
+}
+
+// ---------------------------------------------------------------- mixed stack (both)
+function scaffoldBoth(a) {
+  // web/ (TS app) + api/ (Python), shared .claude/ + docs/ at the root. Per-package git hooks
+  // conflict (husky and pre-commit both own core.hooksPath), so hooks live in ONE root
+  // .pre-commit-config.yaml running both suites.
+  scaffoldTsApp({ ...a, dir: "web", scaffoldLocation: "web", skipHooks: true,
+    framework: !a.framework || a.framework === "none" ? "vite-react" : a.framework });
+  scaffoldPython({ ...a, dir: "api", scaffoldLocation: "api", skipHooks: true });
+
+  writeFileSync(".pre-commit-config.yaml",
+`repos:
+  - repo: local
+    hooks:
+      - id: web-checks
+        name: web typecheck + test
+        entry: bash -c 'cd web && pnpm run typecheck && pnpm run test'
+        language: system
+        pass_filenames: false
+      - id: api-checks
+        name: api lint + typecheck + test
+        entry: bash -c 'cd api && uv run ruff check . && uv run mypy src && uv run pytest'
+        language: system
+        pass_filenames: false
+`);
+  run(`./api/.venv/bin/pre-commit install`, { allowFail: true });
+
+  // CI matrix over both packages (written even without sandcastle — it's the merge gate).
+  mkdirSync(".github/workflows", { recursive: true });
+  let web = readFileSync("templates/ts/ci.yml", "utf8")
+    .replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: web")
+    .replace("cache: pnpm", "cache: pnpm\n          cache-dependency-path: web/pnpm-lock.yaml");
+  let api = readFileSync("templates/py/ci.yml", "utf8")
+    .replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: api");
+  const webJob = web.slice(web.indexOf("jobs:") + 5).replace(/^\s*ci:/m, "  ci-web:");
+  const apiJob = api.slice(api.indexOf("jobs:") + 5).replace(/^\s*ci:/m, "  ci-api:");
+  writeFileSync(".github/workflows/ci.yml",
+`# CI gate — mixed-stack matrix: web/ (pnpm) + api/ (uv). Both jobs must be green to merge.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+${webJob}
+${apiJob}`);
 }
 
 // ---------------------------------------------------------------- skills
@@ -293,7 +362,8 @@ function installSkills(a) {
 // ---------------------------------------------------------------- sandcastle
 function setupSandcastle(a) {
   if (!a.sandcastle?.enabled) return;
-  const stackDir = a.language === "typescript" ? "templates/ts" : "templates/py";
+  // mixed-stack AFK builds the web package by default (override per-run via SC_PKG_DIR)
+  const stackDir = a.language === "python" ? "templates/py" : "templates/ts";
   const pnpmV = out("pnpm --version");
 
   // runtime at repo ROOT (the runner imports it from the root)
@@ -315,14 +385,24 @@ function setupSandcastle(a) {
   rmSync(".sandcastle/main.ts", { force: true }); // replaced by the validated A2 loop
 
   copyFileSync(`${stackDir}/sandcastle-main.mts`, ".sandcastle/main.mts");
+  if (a.language === "both") {
+    const m = readFileSync(".sandcastle/main.mts", "utf8")
+      .replace('process.env.SC_PKG_DIR || "."', 'process.env.SC_PKG_DIR || "web"');
+    writeFileSync(".sandcastle/main.mts", m);
+  }
   copyFileSync(`${stackDir}/sandcastle-prompt.md`, ".sandcastle/prompt.md");
   copyFileSync(`${stackDir}/sandcastle-doctor.mjs`, ".sandcastle/doctor.mjs");
   mkdirSync(".github/workflows", { recursive: true });
-  let ci = readFileSync(`${stackDir}/ci.yml`, "utf8");
-  if (a.dir !== ".") {
-    ci = ci.replace("runs-on: ubuntu-latest", `runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: ${a.dir}`);
+  if (a.language === "both") {
+    log("mixed-stack: keeping the matrix ci.yml written by scaffoldBoth().");
+  } else {
+    let ci = readFileSync(`${stackDir}/ci.yml`, "utf8");
+    if (a.dir !== ".") {
+      ci = ci.replace("runs-on: ubuntu-latest", `runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: ${a.dir}`)
+        .replace("cache: pnpm", `cache: pnpm\n          cache-dependency-path: ${a.dir}/pnpm-lock.yaml`);
+    }
+    writeFileSync(".github/workflows/ci.yml", ci);
   }
-  writeFileSync(".github/workflows/ci.yml", ci);
 
   // 0.10.0 scaffold ships an npm-only Dockerfile; the container needs the project's real toolchain.
   if (a.sandcastle.mode === "docker" && existsSync(".sandcastle/Dockerfile")) {
@@ -350,7 +430,9 @@ function finalize(a, answersPath) {
 
   // README "How to run"
   if (existsSync("README.md")) {
-    const cmds = a.language === "typescript"
+    const cmds = a.language === "both"
+      ? "- **web/**: `pnpm install` · `pnpm test` · `pnpm run typecheck` · `pnpm run build`\n- **api/**: `uv sync` · `uv run pytest` · `uv run ruff check .` · `uv run mypy src`"
+      : a.language === "typescript"
       ? "- `pnpm install` · `pnpm test` · `pnpm run typecheck` · `pnpm run build`"
       : "- `uv sync` · `uv run pytest` · `uv run ruff check .` · `uv run mypy src`";
     const readme = readFileSync("README.md", "utf8")
@@ -363,15 +445,11 @@ function finalize(a, answersPath) {
 
 function selfCheck(a) {
   log("self-check: running the project's feedback loops…");
-  if (a.language === "typescript") {
-    run(`pnpm run typecheck`, { cwd: a.dir });
-    run(`pnpm run test`, { cwd: a.dir });
-    run(`pnpm run build`, { cwd: a.dir });
-  } else {
-    run(`uv run ruff check .`, { cwd: a.dir });
-    run(`uv run mypy src`, { cwd: a.dir });
-    run(`uv run pytest`, { cwd: a.dir });
-  }
+  const ts = (dir) => { run(`pnpm run typecheck`, { cwd: dir }); run(`pnpm run test`, { cwd: dir }); run(`pnpm run build`, { cwd: dir }); };
+  const py = (dir) => { run(`uv run ruff check .`, { cwd: dir }); run(`uv run mypy src`, { cwd: dir }); run(`uv run pytest`, { cwd: dir }); };
+  if (a.language === "both") { ts("web"); py("api"); }
+  else if (a.language === "typescript") ts(a.dir);
+  else py(a.dir);
   if (!existsSync(".claude/skills/coding-standards/SKILL.md"))
     die("coding-standards skill missing — author it before --cleanup (see coding-standards-guidance.md).");
   log("self-check PASSED");
@@ -399,7 +477,9 @@ function main() {
   if (flag === "--cleanup") return cleanup(a, answersPath);
 
   log(`stack: ${a.language}/${a.projectType} → ${a.dir === "." ? "repo root" : a.dir + "/"}`);
-  if (a.language === "typescript") {
+  if (a.language === "both") {
+    scaffoldBoth(a);
+  } else if (a.language === "typescript") {
     if (a.projectType === "library") scaffoldTsLibrary(a);
     else scaffoldTsApp(a);
   } else {

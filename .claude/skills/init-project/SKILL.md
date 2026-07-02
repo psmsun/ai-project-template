@@ -31,7 +31,7 @@ Conduct a light grilling — for each non-default choice ask *why* and surface t
 (e.g. "Postgres over SQLite — do you need concurrent writes / a hosted DB, or is this
 local-first?"). Ask one decision at a time:
 
-1. **Language** — `typescript` or `python`? (mixed-stack `both` is coming — Phase 3b; until then init one stack, add the second manually)
+1. **Language** — `typescript`, `python`, or `both`? `both` scaffolds a mixed-stack repo: `web/` (TS app, default vite-react) + `api/` (Python), shared `.claude/` + `docs/` at root, one root `.pre-commit-config.yaml` running both suites (husky is skipped — two hook owners conflict), and a matrix `ci.yml` (`ci-web` + `ci-api`). Set `packageManager: "pnpm+uv"` for `both`.
 2. **Project type** — TS: `library` (headless package — no UI, no React) or app (`vite-react`, `react-router`, `nextjs` → set `framework`); Python: `library`, `cli`, or `service`.
 3. **Scaffold location** — `.` (repo root) or a subfolder (e.g. `core/`) for monorepo layouts where `.claude/` + `docs/` stay shared at the root.
 4. **Database** — `none` (default for libraries), `sqlite`, `postgres`.
