@@ -45,7 +45,11 @@ CI gate → review-agent → auto-merge → loop-until-dry; HITL issues are hard
 
 ## TODO
 
-- [ ] **T1 — Make init mostly deterministic (token/time win).** ~80% of `init-project` is
+> **2026-07-02 — Template-upgrade epic shipped (PRD #4, v0.2.0):** self-CI (validate-template.mjs + template-ci),
+> deterministic init (T1 → scripts/init.mjs), Python parity (templates/py/ + uv-troubleshooting), mixed-stack `both`
+> (web/+api/, ci-web+ci-api matrix), versioning stamp + org overlay. Issues #5–#10 closed with commit links; QA sign-off in #11.
+
+- [x] **T1 — Make init mostly deterministic (token/time win).** ~80% of `init-project` is
   deterministic (scaffold, `npx skills add` loop, sandcastle patches, finalize) but the LLM agent
   runs every command + writes every file by hand, burning tokens and minutes. Ship a parameterized
   `init.mjs` that takes the interview answers and does scaffold + skill-installs + sandcastle +
@@ -55,7 +59,7 @@ CI gate → review-agent → auto-merge → loop-until-dry; HITL issues are hard
 - [ ] **T3b — Verify sandcastle *no-sandbox* mode e2e.** Docker mode is now verified end-to-end
   (real run: 9 issues built, `claude setup-token` confirmed working in the container). The
   `noSandbox()` path is still unrun.
-- [ ] **T5 — (maybe) Trim coding-standards LLM cost.** Ship a per-ecosystem skeleton the LLM only
+- [ ] **T5 — (unblocked by T1; skeleton could live in init.mjs)  (maybe) Trim coding-standards LLM cost.** Ship a per-ecosystem skeleton the LLM only
   fills/prunes instead of authoring from scratch. Evaluate token saving vs quality. (Depends on T1.)
 
 ## DONE (shipped to template main)
