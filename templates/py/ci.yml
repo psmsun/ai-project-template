@@ -1,0 +1,39 @@
+# CI gate (backlog A3) — Python/uv variant. The required status check the PR-per-issue runner
+# holds merges on. Keep the job id `ci` stable: the runner and branch protection reference the
+# check by name.
+#
+# For a subfolder package (e.g. api/), set `defaults.run.working-directory: api`.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Typecheck
+        run: uv run mypy src
+
+      - name: Test
+        run: uv run pytest
