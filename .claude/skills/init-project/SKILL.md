@@ -120,15 +120,15 @@ patching the scaffold. (All verified end-to-end against a real run.)
    --sandbox docker --issue-tracker github-issues --template simple-loop --build-image false
    --create-label false`. Then **delete the scaffolded `.sandcastle/main.ts`** — you replace it next.
 3. **Copy the validated A2 artifacts** (don't hand-write these):
-   - `templates/sandcastle-main.mts` → `.sandcastle/main.mts` — the PR-per-issue loop. Set
+   - `templates/ts/sandcastle-main.mts` → `.sandcastle/main.mts` — the PR-per-issue loop. Set
      `SC_PKG_DIR` via env if the package isn't root (`docker()` sandbox by default; for no-sandbox swap
      to `noSandbox()`). It already runs the doctor pre-flight, the resilient pnpm install hook, and the
      runner-enforced CI gate.
-   - `templates/sandcastle-prompt.md` → `.sandcastle/prompt.md` — the single-assigned-issue prompt
+   - `templates/ts/sandcastle-prompt.md` → `.sandcastle/prompt.md` — the single-assigned-issue prompt
      (the loop fills its `<<ISSUE_JSON>>` placeholder each iteration). Adjust the feedback-loop commands
      to the project's real **pnpm** typecheck/test/build scripts.
-   - `templates/sandcastle-doctor.mjs` → `.sandcastle/doctor.mjs` — self-healing pre-flight.
-   - `templates/ci.yml` → `.github/workflows/ci.yml` — the CI gate (A3). For a subfolder package set
+   - `templates/ts/sandcastle-doctor.mjs` → `.sandcastle/doctor.mjs` — self-healing pre-flight.
+   - `templates/ts/ci.yml` → `.github/workflows/ci.yml` — the CI gate (A3). For a subfolder package set
      `defaults.run.working-directory`.
 4. **Fix the Dockerfile** — the 0.10.0 scaffold (`FROM node:22-bookworm`) installs **only npm**; a
    pnpm project needs pnpm in the container. While still root (before the `USER` switch) add

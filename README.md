@@ -93,7 +93,7 @@ stress-testing plans.
     improve-codebase-architecture/
     write-a-skill/             # offline fallback (also available remotely)
 templates/
-  sandcastle-prompt.md         # generic AFK prompt; init drops it into .sandcastle/
+  ts/                          # TypeScript/pnpm stack templates (ci.yml, sandcastle loop + doctor + prompt)
 template.config.example.json   # stack record; init writes template.config.json
 CLAUDE.md                      # tiny; points at the coding-standards skill
 ```

@@ -8,7 +8,7 @@ projects (e.g. `MarkdownConverterV2` / markitdown Phase 0).
 The loop: PRD (human) → prd-to-issues → **self-healing sandcastle run** → PR-per-issue →
 CI gate → review-agent → auto-merge → loop-until-dry; HITL issues are hard stops.
 
-- [~] **A1 — Zero-touch self-healing bootstrap.** `templates/sandcastle-doctor.mjs` checks + auto-fixes
+- [~] **A1 — Zero-touch self-healing bootstrap.** `templates/ts/sandcastle-doctor.mjs` checks + auto-fixes
   T9–T15 (runtime, pnpm pins, workspace, image, secrets) and runs pre-flight from `main.mts`.
   **First fresh clean-init proof (base64-codec-demo, real Opus AFK run) surfaced gaps the template/doctor
   did NOT cover — now fixed in this commit:**
@@ -27,14 +27,14 @@ CI gate → review-agent → auto-merge → loop-until-dry; HITL issues are hard
     built all 3 issues, 33 tests green, merged each to `main`, closed all 3, and pushed to origin — `WRAPPER_EXIT=0`.
     GAP-8 did not recur (committed `allowBuilds` removed the churn). **A1 is proven** for the merge-to-head model;
     A2 remains for atomic PR-per-issue robustness.
-- [x] **A2 — PR-per-issue** (replaces merge-to-head). `templates/sandcastle-main.mts` is a host-driven
+- [x] **A2 — PR-per-issue** (replaces merge-to-head). `templates/ts/sandcastle-main.mts` is a host-driven
   loop: pick the next open AFK issue (priority label, then number) → run the agent on a per-issue branch
   cut from `origin/main` → host pushes the branch + opens a PR `Closes #N` → CI gate → merge-on-green →
   loop-until-dry. Issue closes **iff** the PR merges (atomic). One red/blocked PR stays open and the loop
   continues — the merge-to-head "one bad merge aborts everything" failure (GAP-8) is gone by construction.
   **Validated (base64-codec-a2):** 3 issues each → branch → PR → CI → merged → closed atomically, each
   branching off the prior merge; plus a 1-issue confirm run. `WRAPPER_EXIT=0`.
-- [x] **A3 — CI gate** (`templates/ci.yml`, GitHub Actions): pnpm typecheck+test+build on every PR (and
+- [x] **A3 — CI gate** (`templates/ts/ci.yml`, GitHub Actions): pnpm typecheck+test+build on every PR (and
   `main`). **The runner enforces the gate** (polls the PR's checks, merges only when all green) so it works
   on any plan; branch protection requiring the `ci` check is documented as optional hardening (it's a paid
   feature on private repos — 403 on free). Verified green on every PR + main push in the A2 validation.
