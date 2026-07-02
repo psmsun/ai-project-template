@@ -1,5 +1,5 @@
 {
-  "_comment": "Written by the init-project skill to record the chosen stack. Copy to template.config.json during init.",
+  "_comment": "Written by the init-project skill to record the chosen stack. Copy to template.config.json during init. templateVersion/templateCommit are stamped by scripts/init.mjs from CHANGELOG.md + git HEAD.",
   "language": "typescript",
   "projectType": "library",
   "framework": "none",
@@ -15,5 +15,7 @@
   "codingStandards": {
     "source": "generated",
     "remoteSlug": null
-  }
+  },
+  "templateVersion": null,
+  "templateCommit": null
 }
