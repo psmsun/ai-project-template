@@ -61,6 +61,19 @@ try {
   ok("template.config.example.json");
 } catch (e) { errors.push(`template.config.example.json: ${e.message}`); }
 
+// 6. init.mjs parses and its answers schema matches the config example exactly.
+try {
+  execSync("node --check scripts/init.mjs", { stdio: "pipe" });
+  const { ANSWER_FIELDS } = await import(new URL("./init.mjs", import.meta.url));
+  const cfg = JSON.parse(readFileSync("template.config.example.json", "utf8"));
+  for (const f of ANSWER_FIELDS) if (!(f in cfg)) errors.push(`init.mjs expects answers field '${f}' missing from template.config.example.json`);
+  for (const f of Object.keys(cfg)) {
+    if (f.startsWith("_")) continue; // _comment etc.
+    if (!ANSWER_FIELDS.includes(f)) errors.push(`template.config.example.json field '${f}' unknown to init.mjs ANSWER_FIELDS`);
+  }
+  ok("scripts/init.mjs (parse + answers schema)");
+} catch (e) { errors.push(`scripts/init.mjs: ${e.message}`); }
+
 if (errors.length) {
   console.error(`\nFAIL (${errors.length}):`);
   for (const e of errors) console.error(`  - ${e}`);
