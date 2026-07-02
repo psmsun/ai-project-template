@@ -162,14 +162,16 @@ const PROTECTED = ["CLAUDE.md", "README.md", ".gitignore", ".claude", "docs", "t
 function scaffoldTsApp(a) {
   const pnpmV = out("pnpm --version");
   const target = a.dir === "." ? "_scaffold" : a.dir;
+  // stdin closed (< /dev/null): scaffolders must never hang on a prompt in a non-TTY run
   const scaffolders = {
-    "vite-react": `pnpm create vite ${target} --template react-ts`,
-    "react-router": `npx -y create-react-router@latest ${target} --no-install --no-git-init --yes`,
-    "nextjs": `npx -y create-next-app@latest ${target} --ts --app --eslint --tailwind --src-dir --use-pnpm --yes`,
+    "vite-react": `npm create -y vite@latest ${target} -- --template react-ts < /dev/null`,
+    "react-router": `npx -y create-react-router@latest ${target} --no-install --no-git-init --yes < /dev/null`,
+    "nextjs": `npx -y create-next-app@latest ${target} --ts --app --eslint --tailwind --src-dir --use-pnpm --yes < /dev/null`,
   };
   const cmd = scaffolders[a.framework];
   if (!cmd) die(`unknown TS app framework: ${a.framework} (expected vite-react | react-router | nextjs)`);
   run(cmd);
+  if (!existsSync(join(target, "package.json"))) die(`scaffolder did not produce ${target}/package.json — see its output above`);
 
   if (a.dir === ".") {
     // Move scaffold up; template files win on conflict.
@@ -222,7 +224,12 @@ test("smoke", () => {
 
   // ~/* alias: in the APP tsconfig (Vite's root tsconfig is a references stub); bare paths, no baseUrl.
   const appTc = ["tsconfig.app.json", "tsconfig.json"].map(at).find(existsSync);
-  const tc = JSON.parse(readFileSync(appTc, "utf8").replace(/^\s*\/\/.*$/gm, "")); // vite ships jsonc comments
+  // vite ships JSONC: strip /* */ and // comments + trailing commas before parsing
+  const jsonc = readFileSync(appTc, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/,(\s*[}\]])/g, "$1");
+  const tc = JSON.parse(jsonc);
   tc.compilerOptions = { ...tc.compilerOptions, paths: { "~/*": ["./src/*"] } };
   writeJson(appTc, tc);
 
