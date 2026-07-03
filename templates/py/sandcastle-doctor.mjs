@@ -89,9 +89,11 @@ const mainPath = [".sandcastle/main.mts", ".sandcastle/main.ts"].find(existsSync
 if (mainPath) {
   const f = mainPath.split("/").pop();
   const m = readFileSync(mainPath, "utf8");
-  if (/\b(npm|pnpm) install\b/.test(m)) errors.push(`${f}: install hook uses npm/pnpm but this is a uv project — the onSandboxReady hook should run \`uv sync\``);
-  if (!/uv sync/.test(m)) errors.push(`${f}: onSandboxReady hook must run \`uv sync\` so the agent starts with a ready venv`);
-  if (/gh pr create/.test(m)) {
+  // strip comments first — only CODE mentioning npm/pnpm install is a real problem
+  const code = m.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  if (/\b(npm|pnpm) install\b/.test(code)) errors.push(`${f}: install hook uses npm/pnpm but this is a uv project — the onSandboxReady hook should run \`uv sync\``);
+  if (!/uv sync/.test(code)) errors.push(`${f}: onSandboxReady hook must run \`uv sync\` so the agent starts with a ready venv`);
+  if (/gh pr create/.test(code)) {
     if (!/branchStrategy/.test(m)) errors.push(`${f}: PR-per-issue model needs a branchStrategy (commits land on a per-issue branch)`);
     ok.push(`${f}: PR-per-issue (A2) model`);
   } else {
