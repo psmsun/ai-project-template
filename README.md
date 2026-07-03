@@ -4,9 +4,11 @@ A reusable starter template for **AI-assisted software development**, encoding t
 best practices from Matt Pocock's *AI Coding for Real Engineers* (AI Hero cohort 004).
 
 It is **stack-agnostic as shipped** but **language-aware**: it carries no application code.
-Instead it ships an interactive bootstrapper that, on first run, scaffolds a runnable,
-best-practice project for your chosen stack (**TypeScript** or **Python**), installs the
-workflow skills, and generates a `coding-standards` skill matched to what's actually installed.
+Instead it ships a deterministic bootstrapper that, on first run, scaffolds a runnable,
+best-practice project for your chosen stack (**TypeScript**, **Python**, or **both** —
+`web/` + `api/` mixed-stack), installs the workflow skills, wires the CI gate + org defaults
+(LICENSE, CODEOWNERS, dependabot, CodeQL), and generates a `coding-standards` skill matched
+to what's actually installed.
 
 ---
 
@@ -22,28 +24,32 @@ dev-browser install
 Either:
 
 - **GitHub:** click **“Use this template”** (this repo is set up as a *template repository*), or
-- **degit:** `npx degit <your-org>/ai-project-template my-app && cd my-app`
+- **degit:** `npx degit psmsun/ai-project-template my-app && cd my-app`
 
 Then open the project in Claude Code.
 
 ## Step 1 — run init (do this first)
 
 In Claude Code, run the **`init-project`** skill (e.g. say *“init the project”* or
-*“bootstrap this template”*). It is interactive and asks you to confirm each install **(y/n)**.
+*“bootstrap this template”*). The agent interviews you, then the deterministic
+**`scripts/init.mjs`** does the mechanical work in two passes:
 
-It will:
-
-1. **Interview the stack** — language first (TypeScript / Python), then framework, database,
-   package manager, deploy target, and whether to set up sandcastle.
-2. **Scaffold the toolchain** — run the official scaffolder, then add the recommended baseline
-   (TS: zod, drizzle, vitest, tailwind+shadcn, husky+lint-staged, `~/*` alias · Python: pydantic,
-   ruff, pytest, pre-commit, `src/` layout), with pre-commit hooks running typecheck + test.
-3. **Generate `coding-standards`** — a per-project skill matching the installed stack
-   (preferring a remote skill from skills.sh if a close match exists).
-4. **Install the workflow skills** — remote-first via `npx skills add`, one y/n at a time.
-5. **Optionally set up sandcastle** — `npx @ai-hero/sandcastle init`, Docker **or** no-sandbox.
-6. **Finalize** — wire `CLAUDE.md`, write `template.config.json`, fill the “How to run” section
-   below, then **self-remove** (deletes `init-project/` and `templates/` so it can't run twice).
+1. **Interview** (agent) — language (`typescript` / `python` / `both`), project type, scaffold
+   location, database, package manager (pnpm / uv), deploy target (docker / aws), skill
+   location, sandcastle — recorded to `.init-answers.json`.
+2. **Main pass** (`node scripts/init.mjs .init-answers.json`) — scaffold the toolchain with
+   every validated gotcha baked in (TS: vitest, husky+lint-staged, `~/*` alias, `allowBuilds`
+   map, exact pnpm pin · Python: pydantic, ruff, mypy, pytest, pre-commit, `src/` layout ·
+   both: `web/` + `api/` + root pre-commit), write the **CI gate** (`.github/workflows/ci.yml`,
+   matrix for mixed), install the workflow skills, optionally wire **sandcastle**
+   (Docker or no-sandbox, from `templates/<stack>/`), drop the **org overlay** (LICENSE,
+   CODEOWNERS, PR/issue templates, dependabot, CodeQL), and stamp `template.config.json`
+   with the template version + commit.
+3. **Author `coding-standards`** (agent) — a per-project skill matching what was actually
+   installed (or a close remote match from skills.sh).
+4. **Cleanup pass** (`node scripts/init.mjs .init-answers.json --cleanup`) — runs the real
+   feedback loops (typecheck+test+build / ruff+mypy+pytest), then **self-removes** the
+   template meta (`init-project/`, `templates/`, init scripts) so init can't run twice.
 
 ## The workflow
 
@@ -95,7 +101,7 @@ To pull template improvements into a project created earlier:
 .claude/
   settings.json                # minimal safe permissions (gh, npx skills, sandcastle)
   skills/
-    init-project/              # interactive bootstrapper (self-removes after init)
+    init-project/              # bootstrapper skill (self-removes after init)
       SKILL.md
       coding-standards-guidance.md   # generator playbook: per-ecosystem deps + conventions
       skills-manifest.md             # which skills are remote vs vendored
@@ -103,11 +109,21 @@ To pull template improvements into a project created earlier:
     prd-to-issues/             # vendored
     improve-codebase-architecture/
     write-a-skill/             # offline fallback (also available remotely)
+    pnpm-not-found/            # vendored troubleshooting (pnpm/corepack)
+    pnpm-ignored-builds/       # vendored troubleshooting (native build approval)
+    better-sqlite3-rebuild/    # vendored troubleshooting (native module)
+    uv-troubleshooting/        # vendored troubleshooting (uv/venv/mypy/pytest)
+scripts/
+  init.mjs                     # deterministic init (two-pass; self-removes at cleanup)
+  validate-template.mjs        # template self-check (run by template-ci on every PR)
 templates/
-  ts/                          # TypeScript/pnpm stack templates (ci.yml, sandcastle loop + doctor + prompt)
+  ts/                          # TypeScript/pnpm: ci.yml + sandcastle loop/doctor/prompt
+  py/                          # Python/uv twins (validator enforces the ts/py mirror)
+.github/workflows/template-ci.yml  # CI for the template repo itself
+CHANGELOG.md                   # template versions; init stamps version+commit into projects
 template.config.example.json   # stack record; init writes template.config.json
 CLAUDE.md                      # tiny; points at the coding-standards skill
 ```
 
-Stack-specific skills (`pnpm-not-found`, `better-sqlite3-rebuild`) and `.sandcastle/` itself are
-**not** vendored — `init-project` installs/scaffolds them on demand only if your stack needs them.
+The vendored troubleshooting skills ship in every generated project so AFK agents can
+self-heal; `.sandcastle/` itself is scaffolded on demand only when sandcastle is enabled.
