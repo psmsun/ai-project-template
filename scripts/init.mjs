@@ -358,6 +358,20 @@ ${webJob}
 ${apiJob}`);
 }
 
+// The CI gate ships with EVERY generated project (it's the merge gate, not a sandcastle
+// accessory — QA on #11 caught single-stack/no-sandcastle projects shipping without one).
+function writeCiGate(a) {
+  mkdirSync(".github/workflows", { recursive: true });
+  if (a.language === "both") return; // scaffoldBoth already wrote the ci-web/ci-api matrix
+  const stackDir = a.language === "typescript" ? "templates/ts" : "templates/py";
+  let ci = readFileSync(`${stackDir}/ci.yml`, "utf8");
+  if (a.dir !== ".") {
+    ci = ci.replace("runs-on: ubuntu-latest", `runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: ${a.dir}`)
+      .replace("cache: pnpm", `cache: pnpm\n          cache-dependency-path: ${a.dir}/pnpm-lock.yaml`);
+  }
+  writeFileSync(".github/workflows/ci.yml", ci);
+}
+
 // ---------------------------------------------------------------- skills
 function installSkills(a) {
   if (a.skillLocation !== "project") {
@@ -403,16 +417,7 @@ function setupSandcastle(a) {
   copyFileSync(`${stackDir}/sandcastle-prompt.md`, ".sandcastle/prompt.md");
   copyFileSync(`${stackDir}/sandcastle-doctor.mjs`, ".sandcastle/doctor.mjs");
   mkdirSync(".github/workflows", { recursive: true });
-  if (a.language === "both") {
-    log("mixed-stack: keeping the matrix ci.yml written by scaffoldBoth().");
-  } else {
-    let ci = readFileSync(`${stackDir}/ci.yml`, "utf8");
-    if (a.dir !== ".") {
-      ci = ci.replace("runs-on: ubuntu-latest", `runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: ${a.dir}`)
-        .replace("cache: pnpm", `cache: pnpm\n          cache-dependency-path: ${a.dir}/pnpm-lock.yaml`);
-    }
-    writeFileSync(".github/workflows/ci.yml", ci);
-  }
+  // ci.yml is written by writeCiGate() for every project, sandcastle or not.
 
   // 0.10.0 scaffold ships an npm-only Dockerfile; the container needs the project's real toolchain.
   if (a.sandcastle.mode === "docker" && existsSync(".sandcastle/Dockerfile")) {
@@ -589,6 +594,7 @@ function main() {
   } else {
     scaffoldPython(a);
   }
+  writeCiGate(a);
   installSkills(a);
   setupSandcastle(a);
   finalize(a, answersPath);
