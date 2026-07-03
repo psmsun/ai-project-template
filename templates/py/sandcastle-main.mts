@@ -2,8 +2,10 @@
  * Sandcastle AFK runner — PR-per-issue loop (backlog A2 + A3), Python/uv variant.
  *
  * Identical loop to templates/ts/sandcastle-main.mts; only the sandbox install hook differs
- * (`uv sync` instead of the pnpm install/approve-builds dance — uv has no native-build
- * approval step). The RUNNER itself is still Node (tsx + @ai-hero/sandcastle at the repo root).
+ * (`uv sync` replaces the Node-side dependency-install/approve-builds dance — uv has no
+ * native-build approval step). The RUNNER itself is still Node (tsx + @ai-hero/sandcastle at
+ * the repo root). NOTE: the doctor greps this file for stray npm/pnpm install hooks, so don't
+ * name them literally here.
  *
  * The loop, NOT merge-to-head:
  *   fetch → pick the next open AFK issue (priority label, then number) → run the agent on that
