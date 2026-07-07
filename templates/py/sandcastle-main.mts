@@ -17,7 +17,7 @@
  */
 import { run, claudeCode } from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const PKG_DIR = process.env.SC_PKG_DIR || ".";
@@ -101,8 +101,10 @@ while (processed < MAX_ISSUES) {
   const branch = `sc/issue-${issue.number}`;
   console.log(`\n▶ Issue #${issue.number}: ${issue.title}  →  branch ${branch}\n`);
 
-  // Fill the prompt with THIS single assigned issue and run one agent iteration on its own branch.
-  const prompt = promptTemplate.replace("<<ISSUE_JSON>>", JSON.stringify(issue, null, 2));
+  // Fill the prompt with THIS single assigned issue and run one agent iteration on its own
+  // branch. Replacer function: a plain string replacement treats $&/$'/$` in the issue body
+  // as substitution patterns and corrupts the prompt.
+  const prompt = promptTemplate.replace("<<ISSUE_JSON>>", () => JSON.stringify(issue, null, 2));
   writeFileSync("./.sandcastle/.prompt.effective.md", prompt);
 
   try {
@@ -133,11 +135,14 @@ while (processed < MAX_ISSUES) {
     }
     sh(`git push -u origin ${branch} --force-with-lease`);
     // Open the PR (Closes #N makes the close atomic — the issue closes iff the PR merges).
-    out(
-      `gh pr create --head ${branch} --base main ` +
-        `--title ${JSON.stringify(issue.title)} ` +
-        `--body ${JSON.stringify(`Closes #${issue.number}\n\nAutomated by the sandcastle AFK runner.`)} 2>/dev/null || true`,
-    );
+    // Array-form spawn, NO shell: the issue title is untrusted input and must never be
+    // interpolated into a shell string ($(…)/backticks would execute on the host).
+    // Failure tolerated — the PR may already exist from a prior attempt.
+    spawnSync("gh", [
+      "pr", "create", "--head", branch, "--base", "main",
+      "--title", issue.title,
+      "--body", `Closes #${issue.number}\n\nAutomated by the sandcastle AFK runner.`,
+    ], { stdio: "ignore" });
     const prNumber = out(`gh pr view ${branch} --json number --jq .number`);
     const result = gateAndMerge(prNumber, issue.number); // runner enforces CI green before merge
     console.log(`   issue #${issue.number}: PR #${prNumber} → ${result}`);
