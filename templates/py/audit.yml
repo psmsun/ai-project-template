@@ -1,0 +1,33 @@
+# Dependency audit — NON-BLOCKING (backlog B2.3), Python/uv variant. Deliberately NOT triggered
+# on pull_request: the sandcastle runner merges a PR once its checks are all green, and a newly
+# disclosed advisory would otherwise turn a green PR red and freeze every autonomous merge.
+# Running audit on a schedule (+ manual dispatch) keeps it a triage alert, not a merge gate.
+# The deterministic checks live in ci.yml.
+#
+# For a subfolder package, set `defaults.run.working-directory` (init.mjs does this automatically).
+name: audit
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync
+
+      # Fails on known-vulnerable deps (org policy) — alerts, does not block merges.
+      - name: Audit
+        run: uvx pip-audit --skip-editable

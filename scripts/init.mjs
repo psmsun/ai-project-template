@@ -371,6 +371,32 @@ permissions:
 jobs:
 ${webJob}
 ${apiJob}`);
+
+  // Non-blocking scheduled audit for both packages — a separate schedule-only workflow (never a
+  // PR check) so a new advisory can't freeze the runner's auto-merge (B2.3).
+  let webAudit = readFileSync("templates/ts/audit.yml", "utf8")
+    .replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: web")
+    .replace("cache: pnpm", "cache: pnpm\n          cache-dependency-path: web/pnpm-lock.yaml");
+  let apiAudit = readFileSync("templates/py/audit.yml", "utf8")
+    .replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: api");
+  const webAuditJob = webAudit.slice(webAudit.indexOf("jobs:") + 5).replace(/^\s*audit:/m, "  audit-web:");
+  const apiAuditJob = apiAudit.slice(apiAudit.indexOf("jobs:") + 5).replace(/^\s*audit:/m, "  audit-api:");
+  writeFileSync(".github/workflows/audit.yml",
+`# Non-blocking scheduled dependency audit — web/ (pnpm) + api/ (uv). Schedule-only (never a PR
+# check) so a new advisory can't freeze the runner's auto-merge; the merge gate is ci.yml.
+name: audit
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+${webAuditJob}
+${apiAuditJob}`);
 }
 
 // The CI gate ships with EVERY generated project (it's the merge gate, not a sandcastle
@@ -385,6 +411,20 @@ function writeCiGate(a) {
       .replace("cache: pnpm", `cache: pnpm\n          cache-dependency-path: ${a.dir}/pnpm-lock.yaml`);
   }
   writeFileSync(".github/workflows/ci.yml", ci);
+}
+
+// The dependency audit ships as a SEPARATE, schedule-only workflow (never a PR check) so a new
+// transitive advisory can't turn a green PR red and freeze the runner's auto-merge — see B2.3.
+function writeAuditWorkflow(a) {
+  mkdirSync(".github/workflows", { recursive: true });
+  if (a.language === "both") return; // scaffoldBoth writes the combined audit-web/audit-api file
+  const stackDir = a.language === "typescript" ? "templates/ts" : "templates/py";
+  let audit = readFileSync(`${stackDir}/audit.yml`, "utf8");
+  if (a.dir !== ".") {
+    audit = audit.replace("runs-on: ubuntu-latest", `runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: ${a.dir}`)
+      .replace("cache: pnpm", `cache: pnpm\n          cache-dependency-path: ${a.dir}/pnpm-lock.yaml`);
+  }
+  writeFileSync(".github/workflows/audit.yml", audit);
 }
 
 // ---------------------------------------------------------------- skills
@@ -623,6 +663,7 @@ function main() {
     scaffoldPython(a);
   }
   writeCiGate(a);
+  writeAuditWorkflow(a);
   installSkills(a);
   setupSandcastle(a);
   finalize(a, answersPath);
