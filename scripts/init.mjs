@@ -503,20 +503,25 @@ function setupSandcastle(a) {
   mkdirSync(".github/workflows", { recursive: true });
   // ci.yml is written by writeCiGate() for every project, sandcastle or not.
 
-  // 0.10.0 scaffold ships an npm-only Dockerfile; the container needs the project's real toolchain.
+  // 0.10.0 scaffold ships an npm-only Dockerfile; the container needs the project's real
+  // toolchain. Mixed-stack ("both") runs the pnpm/web build by default (SC_PKG_DIR=web) but can
+  // be pointed at api/ (uv) per-run, so it needs BOTH toolchains baked in — not just uv.
   if (a.sandcastle.mode === "docker" && existsSync(".sandcastle/Dockerfile")) {
     let df = readFileSync(".sandcastle/Dockerfile", "utf8");
-    const setup = a.language === "typescript"
-      ? (df.includes("corepack prepare pnpm") ? null
-        : `ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0\nRUN corepack enable && corepack prepare pnpm@${pnpmV} --activate\n`)
-      : (/astral-sh\/uv/.test(df) ? null
-        : `COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/\n`);
-    if (setup) {
+    const needsPnpm = a.language === "typescript" || a.language === "both";
+    const needsUv = a.language === "python" || a.language === "both";
+    const setups = [];
+    if (needsPnpm && !df.includes("corepack prepare pnpm"))
+      setups.push(`ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0\nRUN corepack enable && corepack prepare pnpm@${pnpmV} --activate\n`);
+    if (needsUv && !/astral-sh\/uv/.test(df))
+      setups.push(`COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/\n`);
+    if (setups.length) {
+      const setup = setups.join("\n");
       df = df.includes("\nUSER ") ? df.replace(/\nUSER /, `\n${setup}\nUSER `) : df + `\n${setup}`;
       writeFileSync(".sandcastle/Dockerfile", df);
     }
-    df = readFileSync(".sandcastle/Dockerfile", "utf8");
-    if (/npm install/.test(df)) log("WARNING: .sandcastle/Dockerfile still contains an `npm install` hook — replace with the project's package manager.");
+    if (/npm install/.test(readFileSync(".sandcastle/Dockerfile", "utf8")))
+      log("WARNING: .sandcastle/Dockerfile still contains an `npm install` hook — replace with the project's package manager.");
   }
   log("sandcastle wired. REMAINING (secrets, can't be scripted): fill .sandcastle/.env — CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`) or ANTHROPIC_API_KEY, plus GH_TOKEN (`gh auth token`). Build the image with `npx @ai-hero/sandcastle docker build-image` or let the doctor do it.");
 }
