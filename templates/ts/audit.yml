@@ -1,0 +1,40 @@
+# Dependency audit — NON-BLOCKING (backlog B2.3). Deliberately NOT triggered on pull_request:
+# the sandcastle runner merges a PR once its checks are all green, and a newly-disclosed
+# advisory in a transitive dep would otherwise turn a previously-green PR red and freeze every
+# autonomous merge. Running audit on a schedule (+ manual dispatch) keeps it a triage alert,
+# not a merge gate. The deterministic checks live in ci.yml.
+#
+# For a subfolder package, set `defaults.run.working-directory` + the setup-node
+# `cache-dependency-path` (init.mjs does this automatically).
+name: audit
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable pnpm
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --config.confirmModulesPurge=false
+
+      # Fails on known-vulnerable production deps (org policy) — alerts, does not block merges.
+      - name: Audit
+        run: pnpm audit --prod --audit-level high

@@ -35,7 +35,7 @@ for (const skill of readdirSync(skillsDir)) {
 
 // 3. Every stack dir under templates/ carries the same required file roles.
 const STACKS = ["ts", "py"];
-const REQUIRED_TEMPLATE_FILES = ["ci.yml", "sandcastle-prompt.md", "sandcastle-doctor.mjs", "sandcastle-main.mts"];
+const REQUIRED_TEMPLATE_FILES = ["ci.yml", "audit.yml", "sandcastle-prompt.md", "sandcastle-doctor.mjs", "sandcastle-main.mts"];
 for (const stack of STACKS) {
   const dir = join("templates", stack);
   if (!existsSync(dir)) { errors.push(`missing stack dir ${dir}`); continue; }
