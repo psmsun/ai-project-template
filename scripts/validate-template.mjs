@@ -76,11 +76,16 @@ try {
   ok("scripts/init.mjs (parse + answers schema)");
 } catch (e) { errors.push(`scripts/init.mjs: ${e.message}`); }
 
-// 7. CHANGELOG: top entry must be a parseable version (init stamps it into generated projects).
+// 7. CHANGELOG: top entry must be a parseable version + carry the template-commit marker
+//    (init stamps both into generated projects; the marker must never be dropped).
 try {
-  const top = (readFileSync("CHANGELOG.md", "utf8").match(/^## \[([\d.]+)\]/m) || [])[1];
+  const cl = readFileSync("CHANGELOG.md", "utf8");
+  const top = (cl.match(/^## \[([\d.]+)\]/m) || [])[1];
   if (!top) errors.push("CHANGELOG.md: no '## [x.y.z]' entry at top — init cannot stamp templateVersion");
   else ok(`CHANGELOG current version ${top}`);
+  if (!/template-commit:\s*[0-9a-f]*/.test(cl))
+    errors.push("CHANGELOG.md: missing `template-commit:` marker — run scripts/stamp-release.mjs (init reads it for templateCommit)");
+  else ok("CHANGELOG template-commit marker present");
 } catch { errors.push("CHANGELOG.md missing"); }
 
 if (errors.length) {
