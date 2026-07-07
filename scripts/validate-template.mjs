@@ -122,8 +122,33 @@ try {
     if (v.ok) ok(`${label} valid YAML`);
     else errors.push(`${label}: invalid YAML — ${v.msg}`);
   }
-  if (unavailable) console.log("  warn: python3+PyYAML unavailable — skipped YAML validation (template-ci guarantees it; see #29)");
+  if (unavailable) {
+    const msg = "python3+PyYAML unavailable — skipped workflow YAML validation";
+    // template-ci sets VALIDATE_STRICT=1 so a missing toolchain fails CI instead of silently
+    // passing; local runs without PyYAML just warn.
+    if (process.env.VALIDATE_STRICT === "1") errors.push(`${msg} (VALIDATE_STRICT=1 requires it)`);
+    else console.log(`  warn: ${msg} (template-ci guarantees it)`);
+  }
 } catch (e) { errors.push(`workflow YAML check failed: ${e.message}`); }
+
+// 9. The sandcastle runners are valid TypeScript-syntax .mts. node --check (check 4) can't parse
+//    TS, so use esbuild's transform when importable. The template repo is toolchain-free, so this
+//    runs in template-ci (which installs esbuild); VALIDATE_STRICT=1 makes its absence fail CI.
+try {
+  const mts = STACKS.map((s) => join("templates", s, "sandcastle-main.mts")).filter(existsSync);
+  let esbuild = null;
+  try { esbuild = await import("esbuild"); } catch {}
+  if (esbuild) {
+    for (const f of mts) {
+      try { await esbuild.transform(readFileSync(f, "utf8"), { loader: "ts", format: "esm" }); ok(`${f} parses (esbuild)`); }
+      catch (e) { errors.push(`${f}: TS syntax error — ${String(e.message).split("\n")[0]}`); }
+    }
+  } else if (process.env.VALIDATE_STRICT === "1") {
+    errors.push("esbuild unavailable — skipped .mts syntax check (VALIDATE_STRICT=1 requires it)");
+  } else {
+    console.log("  warn: esbuild unavailable — skipped .mts syntax check (template-ci installs it)");
+  }
+} catch (e) { errors.push(`.mts syntax check failed: ${e.message}`); }
 
 if (errors.length) {
   console.error(`\nFAIL (${errors.length}):`);
