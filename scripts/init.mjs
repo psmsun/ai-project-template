@@ -712,11 +712,35 @@ function cleanup(a, answersPath) {
   log("cleanup done — init cannot run again. Commit the result.");
 }
 
+// init is a ONE-TIME bootstrap and is NOT transactional (a scaffolder can fail partway on a
+// network hiccup). Refuse to run over a completed or partial prior run rather than mutating
+// existing state via the scattered existsSync guards (B3.2). INIT_FORCE=1 overrides for a
+// deliberate in-place resume (the scaffolders are individually idempotent).
+function assertCleanForInit(a) {
+  const found = [];
+  if (existsSync("template.config.json")) found.push("template.config.json — a previous init completed finalize()");
+  if (existsSync(".sandcastle")) found.push(".sandcastle/ — sandcastle already wired");
+  if (existsSync("LICENSE")) found.push("LICENSE — org overlay already dropped");
+  if (existsSync(".github/workflows/ci.yml")) found.push(".github/workflows/ci.yml — CI gate already written");
+  if (a.language === "both") {
+    if (existsSync("web/package.json")) found.push("web/package.json — web/ already scaffolded");
+    if (existsSync("api/pyproject.toml")) found.push("api/pyproject.toml — api/ already scaffolded");
+  } else {
+    const marker = a.language === "python" ? "pyproject.toml" : "package.json";
+    if (existsSync(join(a.dir, marker))) found.push(`${join(a.dir, marker)} — project already scaffolded`);
+  }
+  if (found.length && process.env.INIT_FORCE !== "1")
+    die(`init looks already-run or partially-run — found:\n  - ${found.join("\n  - ")}\n\n` +
+        `init is a one-time bootstrap. Reset with a fresh template clone (or \`git checkout . && git clean -fdx\`), then re-run.\n` +
+        `To resume a genuinely partial run IN PLACE, re-run with INIT_FORCE=1 after reviewing the artifacts above.`);
+}
+
 // ---------------------------------------------------------------- main
 function main() {
   const [answersPath, flag] = process.argv.slice(2);
   const a = loadAnswers(answersPath);
   if (flag === "--cleanup") return cleanup(a, answersPath);
+  assertCleanForInit(a);
 
   log(`stack: ${a.language}/${a.projectType} → ${a.dir === "." ? "repo root" : a.dir + "/"}`);
   if (a.language === "both") {

@@ -69,6 +69,10 @@ Then:
 node scripts/init.mjs .init-answers.json
 ```
 
+Init is a **one-time** bootstrap: it refuses to run over a completed or partially-scaffolded
+project (it lists what it found). Reset from a clean template clone before retrying, or — only to
+resume a genuinely partial run in place — re-run with `INIT_FORCE=1`.
+
 The script scaffolds the toolchain (with every validated gotcha: exact `packageManager` pin,
 `allowBuilds` map, `ignoreDeprecations: "6.0"`, `~/*` alias, husky v9, mypy hook deps, pytest
 src-layout…), installs the workflow skills, wires sandcastle from `templates/<stack>/`, and
