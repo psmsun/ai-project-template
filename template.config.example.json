@@ -1,5 +1,7 @@
 {
   "_comment": "Written by the init-project skill to record the chosen stack. Copy to template.config.json during init. templateVersion/templateCommit are stamped by scripts/init.mjs from CHANGELOG.md + git HEAD.",
+  "org": "psmsun",
+  "license": "proprietary",
   "language": "typescript",
   "projectType": "library",
   "framework": "none",

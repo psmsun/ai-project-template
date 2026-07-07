@@ -25,11 +25,12 @@ import { pathToFileURL } from "node:url";
 export const ANSWER_FIELDS = [
   "language", "projectType", "framework", "scaffoldLocation", "skillLocation",
   "database", "packageManager", "deployTarget", "sandcastle", "codingStandards",
+  "org", "license",
 ];
 // Written by finalize(), not asked in the interview.
 export const STAMPED_FIELDS = ["templateVersion", "templateCommit"];
-const ORG = "psmsun"; // CODEOWNERS / LICENSE owner
 
+const LICENSES = ["proprietary", "mit", "none"]; // org overlay license (default: proprietary, scoped to `org`)
 const LANGUAGES = ["typescript", "python", "both"]; // both = web/ (TS) + api/ (Python), shared .claude/ + docs/
 const log = (m) => console.log(`\n[init] ${m}`);
 const die = (m) => { console.error(`\n[init] FATAL: ${m}`); process.exit(1); };
@@ -66,6 +67,10 @@ function loadAnswers(path) {
     if (a.skillLocation !== "project")
       die(`sandcastle requires skillLocation "project" (answers say "${a.skillLocation}") — the Docker container only sees repo-committed skills`);
   }
+  if (typeof a.org !== "string" || !a.org.trim())
+    die(`org must be a non-empty string (the GitHub org/owner for LICENSE + CODEOWNERS)`);
+  if (!LICENSES.includes(a.license))
+    die(`license must be one of ${LICENSES.join("/")} (answers say ${a.license})`);
   a.dir = a.scaffoldLocation && a.scaffoldLocation !== "." ? a.scaffoldLocation : ".";
   return a;
 }
@@ -504,16 +509,43 @@ function setupSandcastle(a) {
 // Org overlay (Q3 answers): license, ownership, PR/issue templates, dependency scanning.
 function dropOrgFiles(a) {
   const year = new Date().getFullYear();
-  if (!existsSync("LICENSE"))
-    writeFileSync("LICENSE",
-`Copyright (c) ${year} ${ORG}. All rights reserved.
+  const LICENSE_TEXT = {
+    proprietary:
+`Copyright (c) ${year} ${a.org}. All rights reserved.
 
 This software is proprietary. No license, express or implied, is granted to any
 party for any use, reproduction, modification, or distribution without prior
 written permission from the copyright holder.
-`);
+`,
+    mit:
+`MIT License
+
+Copyright (c) ${year} ${a.org}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`,
+  };
+  // license "none" ships no LICENSE file (project is unlicensed / owner decides later).
+  if (a.license !== "none" && !existsSync("LICENSE"))
+    writeFileSync("LICENSE", LICENSE_TEXT[a.license]);
   mkdirSync(".github/ISSUE_TEMPLATE", { recursive: true });
-  if (!existsSync(".github/CODEOWNERS")) writeFileSync(".github/CODEOWNERS", `* @${ORG}\n`);
+  if (!existsSync(".github/CODEOWNERS")) writeFileSync(".github/CODEOWNERS", `* @${a.org}\n`);
   if (!existsSync(".github/pull_request_template.md"))
     writeFileSync(".github/pull_request_template.md",
 `## What
@@ -581,7 +613,7 @@ jobs:
           languages: \${{ matrix.language }}
       - uses: github/codeql-action/analyze@v3
 `);
-  log(`org overlay written (LICENSE proprietary/${ORG}, CODEOWNERS, PR/issue templates, dependabot, codeql).`);
+  log(`org overlay written (LICENSE ${a.license === "none" ? "omitted" : `${a.license}/${a.org}`}, CODEOWNERS @${a.org}, PR/issue templates, dependabot, codeql).`);
 }
 
 function templateStamp() {
