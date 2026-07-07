@@ -39,7 +39,7 @@ standards are worse than none.
   default) or `pg`/`postgres` (Postgres).
 - **Testing:** `vitest` (globals mode).
 - **UI (framework projects):** `tailwindcss` + `shadcn` (`npx shadcn@latest init`).
-- **Hooks:** `husky` + `lint-staged`; pre-commit runs typecheck + test.
+- **Hooks:** `husky` v9; pre-commit runs typecheck + test.
 - **Config:** `~/*` path alias → app source root in `tsconfig.json` (and bundler resolver).
 
 ### Conventions (universal core)

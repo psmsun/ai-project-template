@@ -38,7 +38,7 @@ In Claude Code, run the **`init-project`** skill (e.g. say *“init the project�
    location, database, package manager (pnpm / uv), deploy target (docker / aws), skill
    location, sandcastle — recorded to `.init-answers.json`.
 2. **Main pass** (`node scripts/init.mjs .init-answers.json`) — scaffold the toolchain with
-   every validated gotcha baked in (TS: vitest, husky+lint-staged, `~/*` alias, `allowBuilds`
+   every validated gotcha baked in (TS: vitest, husky pre-commit, `~/*` alias, `allowBuilds`
    map, exact pnpm pin · Python: pydantic, ruff, mypy, pytest, pre-commit, `src/` layout ·
    both: `web/` + `api/` + root pre-commit), write the **CI gate** (`.github/workflows/ci.yml`,
    matrix for mixed), install the workflow skills, optionally wire **sandcastle**
