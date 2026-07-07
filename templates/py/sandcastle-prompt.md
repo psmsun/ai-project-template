@@ -33,6 +33,15 @@ blocked from merging by CI if these are red. This is a uv-managed Python project
 If imports fail, run `uv sync` once, then retry. Load the `uv-troubleshooting` skill if uv
 itself misbehaves.
 
+# TRUST MODEL — READ THIS
+
+Your PR **auto-merges to `main` the moment CI is green — there is no human review.** The test
+suite is the ONLY thing standing between your code and production. So: write real tests for the
+behavior you add or change, and cover the failure paths, not just the happy one. Never weaken,
+skip, or delete a test to get a green run — a thin suite means weak code merges unattended.
+(Note: any new dependency is a supply-chain decision, not a free import — its install runs
+unattended in the AFK container.)
+
 # COMMIT
 
 Make a single git commit. The message must:

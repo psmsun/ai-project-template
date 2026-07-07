@@ -9,8 +9,8 @@
  *
  * The loop, NOT merge-to-head:
  *   fetch → pick the next open AFK issue (priority label, then number) → run the agent on that
- *   ONE issue on its own branch → host pushes the branch, opens a PR "Closes #N", enables
- *   auto-merge → GitHub's CI gate (A3) merges it when green → "issue closed" ⇔ "green code on main".
+ *   ONE issue on its own branch → host pushes the branch, opens a PR "Closes #N" → the runner
+ *   polls the PR's checks and merges it on green (A3) → "issue closed" ⇔ "green code on main".
  *
  * Config via env: SC_PKG_DIR (default "."), SC_MODEL, SC_MAX_ISSUES (safety cap),
  * SC_MERGE_TIMEOUT_S (how long to wait for a PR's CI+merge before moving on).
@@ -126,7 +126,8 @@ while (processed < MAX_ISSUES) {
       },
     });
 
-    // Host owns delivery: push the branch, open the PR (Closes #N), enable auto-merge.
+    // Host owns delivery: push the branch, open the PR (Closes #N); gateAndMerge() then polls
+    // the PR's checks and merges on green (this runner IS the gate — no GitHub auto-merge).
     // If the agent produced no commits, there's nothing to push — skip and leave the issue open.
     const ahead = out(`git rev-list --count origin/main..${branch} 2>/dev/null || echo 0`);
     if (ahead === "0") {

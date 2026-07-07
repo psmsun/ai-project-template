@@ -32,6 +32,8 @@ export const STAMPED_FIELDS = ["templateVersion", "templateCommit"];
 
 const LICENSES = ["proprietary", "mit", "none"]; // org overlay license (default: proprietary, scoped to `org`)
 const LANGUAGES = ["typescript", "python", "both"]; // both = web/ (TS) + api/ (Python), shared .claude/ + docs/
+// UI-facing = renders pages: a TS app framework, or mixed-stack (has web/). Libraries + Python are headless.
+const isUiStack = (a) => a.language === "both" || (a.language === "typescript" && a.projectType !== "library");
 const log = (m) => console.log(`\n[init] ${m}`);
 const die = (m) => { console.error(`\n[init] FATAL: ${m}`); process.exit(1); };
 
@@ -124,16 +126,6 @@ export default defineConfig({
   format: ["esm", "cjs"],
   dts: true,
   clean: true,
-});
-`);
-  writeFileSync(at("vitest.config.ts"),
-`import { defineConfig, configDefaults } from "vitest/config";
-
-export default defineConfig({
-  test: {
-    globals: true,
-    exclude: [...configDefaults.exclude, "**/.sandcastle/**", "dist/**"],
-  },
 });
 `);
   mkdirSync(at("src"), { recursive: true });
@@ -288,13 +280,13 @@ strict = true
   if (!a.skipHooks) writeFileSync(at(".pre-commit-config.yaml"),
 `repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.15.20
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.0
+    rev: v2.1.0
     hooks:
       - id: mypy
         additional_dependencies: [pydantic]  # isolated venv can't resolve pydantic otherwise
@@ -672,9 +664,17 @@ function finalize(a, answersPath) {
       : a.language === "typescript"
       ? "- `pnpm install` · `pnpm test` · `pnpm run typecheck` · `pnpm run build`"
       : "- `uv sync` · `uv run pytest` · `uv run ruff check .` · `uv run mypy src`";
-    const readme = readFileSync("README.md", "utf8")
+    let readme = readFileSync("README.md", "utf8")
       .replace(/> _Filled in by `init-project`[^\n]*\n(>[^\n]*\n)*/m, `${cmds}\n`);
+    // dev-browser only matters to UI-facing stacks; drop its prerequisite for headless projects.
+    if (!isUiStack(a))
+      readme = readme.replace(/## Prerequisites\n\n```bash\nnpm install -g dev-browser\ndev-browser install\n```\n\n/, "");
     writeFileSync("README.md", readme);
+  }
+  // Likewise strip the CLAUDE.md browser-automation section for headless stacks.
+  if (!isUiStack(a) && existsSync("CLAUDE.md")) {
+    const md = readFileSync("CLAUDE.md", "utf8").replace(/\n## Browser automation\n[\s\S]*$/m, "\n");
+    writeFileSync("CLAUDE.md", md);
   }
   log(`wrote template.config.json. Answers file kept at ${answersPath} until --cleanup.`);
   log("NEXT (agent): author .claude/skills/coding-standards/ per coding-standards-guidance.md, then run: node scripts/init.mjs " + answersPath + " --cleanup");
@@ -699,7 +699,7 @@ function selfCheck(a) {
 
 function cleanup(a, answersPath) {
   selfCheck(a);
-  for (const p of [".claude/skills/init-project", "templates", "template.config.example.json", "TEMPLATE-IMPROVEMENTS.md", "CHANGELOG.md", answersPath, "scripts/init.mjs", "scripts/validate-template.mjs", "scripts/stamp-release.mjs"]) {
+  for (const p of [".claude/skills/init-project", "templates", "template.config.example.json", "TEMPLATE-IMPROVEMENTS.md", "CHANGELOG.md", "docs/superpowers", answersPath, "scripts/init.mjs", "scripts/validate-template.mjs", "scripts/stamp-release.mjs"]) {
     rmSync(p, { recursive: true, force: true });
     log(`removed ${p}`);
   }
