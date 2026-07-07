@@ -12,5 +12,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate template (skills, templates, config)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Guarantee the validator's optional tooling is present so VALIDATE_STRICT can turn a
+      # missing toolchain into a CI failure (never a silent skip):
+      #   - PyYAML  → check 8 parses every generated workflow (stack + synthesized mixed)
+      #   - esbuild → check 9 syntax-checks the .mts sandcastle runners (node --check can't parse TS)
+      - name: Ensure PyYAML
+        run: pip install pyyaml
+      - name: Ensure esbuild
+        run: npm install --no-save --no-package-lock esbuild
+
+      - name: Validate template (skills, templates, config, workflow YAML, .mts syntax)
         run: node scripts/validate-template.mjs
+        env:
+          VALIDATE_STRICT: "1"
