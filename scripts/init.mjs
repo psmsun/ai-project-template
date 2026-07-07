@@ -143,7 +143,7 @@ test("hello", () => {
 });
 `);
   // ~/* must resolve in the test runner too, not just tsc.
-  run(`pnpm add -D typescript tsup vitest @types/node vite-tsconfig-paths husky lint-staged`, { cwd: dir });
+  run(`pnpm add -D typescript tsup vitest @types/node vite-tsconfig-paths husky`, { cwd: dir });
   writeFileSync(at("vitest.config.ts"),
 `import { defineConfig, configDefaults } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
@@ -231,7 +231,7 @@ test("smoke", () => {
   writeFileSync(at("pnpm-workspace.yaml"),
     `packages:\n  - .\nallowBuilds:\n${builds.map((b) => `  ${b}: true`).join("\n")}\n`);
 
-  run(`pnpm add zod && pnpm add -D vitest husky lint-staged vite-tsconfig-paths`, { cwd: dir });
+  run(`pnpm add zod && pnpm add -D vitest husky vite-tsconfig-paths`, { cwd: dir });
   if (a.database === "sqlite") run(`pnpm add drizzle-orm better-sqlite3 && pnpm add -D drizzle-kit @types/better-sqlite3`, { cwd: dir });
   if (a.database === "postgres") run(`pnpm add drizzle-orm pg && pnpm add -D drizzle-kit @types/pg`, { cwd: dir });
 
