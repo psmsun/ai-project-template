@@ -88,6 +88,43 @@ try {
   else ok("CHANGELOG template-commit marker present");
 } catch { errors.push("CHANGELOG.md missing"); }
 
+// 8. The generated workflows are valid YAML — the stack templates AND the synthesized mixed-stack
+//    ci.yml/audit.yml (the assembler that used to string-splice, B3.1). Parsed with python3+PyYAML
+//    (present on GitHub runners; #29 guarantees it in template-ci). If the toolchain is absent we
+//    WARN rather than silently pass — never report coverage we didn't run.
+function yamlVerdict(text) {
+  try {
+    execSync('python3 -c "import sys,yaml; yaml.safe_load(sys.stdin.read())"',
+      { input: text, stdio: ["pipe", "ignore", "pipe"] });
+    return { ok: true };
+  } catch (e) {
+    const msg = String(e.stderr || e.message || "");
+    if (e.code === "ENOENT" || /No module named 'yaml'|not found/.test(msg)) return { unavailable: true };
+    return { ok: false, msg: msg.split("\n").filter(Boolean).pop() || "parse error" };
+  }
+}
+try {
+  const targets = [];
+  for (const stack of STACKS) for (const wf of ["ci.yml", "audit.yml"]) {
+    const f = join("templates", stack, wf);
+    if (existsSync(f)) targets.push([f, readFileSync(f, "utf8")]);
+  }
+  try {
+    const { buildMixedWorkflows } = await import(new URL("./init.mjs", import.meta.url));
+    const m = buildMixedWorkflows();
+    targets.push(["<synthesized mixed ci.yml>", m.ci], ["<synthesized mixed audit.yml>", m.audit]);
+  } catch (e) { errors.push(`mixed-stack workflow assembly threw: ${e.message}`); }
+
+  let unavailable = false;
+  for (const [label, text] of targets) {
+    const v = yamlVerdict(text);
+    if (v.unavailable) { unavailable = true; break; }
+    if (v.ok) ok(`${label} valid YAML`);
+    else errors.push(`${label}: invalid YAML — ${v.msg}`);
+  }
+  if (unavailable) console.log("  warn: python3+PyYAML unavailable — skipped YAML validation (template-ci guarantees it; see #29)");
+} catch (e) { errors.push(`workflow YAML check failed: ${e.message}`); }
+
 if (errors.length) {
   console.error(`\nFAIL (${errors.length}):`);
   for (const e of errors) console.error(`  - ${e}`);

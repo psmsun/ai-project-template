@@ -352,16 +352,47 @@ function scaffoldBoth(a) {
 `);
   run(`./api/.venv/bin/pre-commit install`, { allowFail: true });
 
-  // CI matrix over both packages (written even without sandcastle — it's the merge gate).
+  // CI matrix + scheduled audit over both packages (written even without sandcastle — ci is the
+  // merge gate). Built by the shared, asserted assembler so a template reformat fails loudly
+  // instead of emitting a malformed workflow (B3.1).
   mkdirSync(".github/workflows", { recursive: true });
-  let web = readFileSync("templates/ts/ci.yml", "utf8")
-    .replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: web")
-    .replace("cache: pnpm", "cache: pnpm\n          cache-dependency-path: web/pnpm-lock.yaml");
-  let api = readFileSync("templates/py/ci.yml", "utf8")
-    .replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: api");
-  const webJob = web.slice(web.indexOf("jobs:") + 5).replace(/^\s*ci:/m, "  ci-web:");
-  const apiJob = api.slice(api.indexOf("jobs:") + 5).replace(/^\s*ci:/m, "  ci-api:");
-  writeFileSync(".github/workflows/ci.yml",
+  const mixed = buildMixedWorkflows();
+  writeFileSync(".github/workflows/ci.yml", mixed.ci);
+  writeFileSync(".github/workflows/audit.yml", mixed.audit);
+}
+
+// ---------------------------------------------------------------- workflow assembly (B3.1)
+// Isolate the single job under a stack template's `jobs:` key and rename it, injecting the
+// subfolder working-directory (+ pnpm cache path for the TS stack). Structured + asserted: a
+// template that grows a second job, a stray top-level key after `jobs:`, or loses its `jobs:`
+// key throws HERE rather than silently producing a broken mixed workflow.
+export function stackJob(yamlText, jobName, { dir } = {}) {
+  const lines = yamlText.split("\n");
+  const jobsIdx = lines.findIndex((l) => /^jobs:\s*$/.test(l));
+  if (jobsIdx < 0) throw new Error("stack template has no top-level `jobs:` key");
+  const after = lines.slice(jobsIdx + 1);
+  const stray = after.find((l) => /^\S/.test(l) && l.trim() && !l.startsWith("#"));
+  if (stray) throw new Error(`unexpected top-level content after jobs: ${JSON.stringify(stray)}`);
+  const headers = after.filter((l) => /^ {2}[A-Za-z0-9_-]+:\s*$/.test(l));
+  if (headers.length !== 1) throw new Error(`expected exactly one job under jobs:, found ${headers.length}`);
+  let block = after.join("\n").replace(/^ {2}[A-Za-z0-9_-]+:/m, `  ${jobName}:`);
+  if (dir) {
+    block = block
+      .replace("runs-on: ubuntu-latest", `runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: ${dir}`)
+      .replace("cache: pnpm", `cache: pnpm\n          cache-dependency-path: ${dir}/pnpm-lock.yaml`);
+  }
+  return block.replace(/\n+$/, "");
+}
+
+// Assemble the mixed-stack ci.yml (ci-web + ci-api merge gate) and audit.yml (audit-web +
+// audit-api, schedule-only) from the single-stack templates. Pure: returns strings, writes
+// nothing — validate-template.mjs calls this to YAML-check the emitted workflows.
+export function buildMixedWorkflows() {
+  const ciWeb = stackJob(readFileSync("templates/ts/ci.yml", "utf8"), "ci-web", { dir: "web" });
+  const ciApi = stackJob(readFileSync("templates/py/ci.yml", "utf8"), "ci-api", { dir: "api" });
+  const auditWeb = stackJob(readFileSync("templates/ts/audit.yml", "utf8"), "audit-web", { dir: "web" });
+  const auditApi = stackJob(readFileSync("templates/py/audit.yml", "utf8"), "audit-api", { dir: "api" });
+  const ci =
 `# CI gate — mixed-stack matrix: web/ (pnpm) + api/ (uv). Both jobs must be green to merge.
 name: ci
 
@@ -374,19 +405,10 @@ permissions:
   contents: read
 
 jobs:
-${webJob}
-${apiJob}`);
-
-  // Non-blocking scheduled audit for both packages — a separate schedule-only workflow (never a
-  // PR check) so a new advisory can't freeze the runner's auto-merge (B2.3).
-  let webAudit = readFileSync("templates/ts/audit.yml", "utf8")
-    .replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: web")
-    .replace("cache: pnpm", "cache: pnpm\n          cache-dependency-path: web/pnpm-lock.yaml");
-  let apiAudit = readFileSync("templates/py/audit.yml", "utf8")
-    .replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: api");
-  const webAuditJob = webAudit.slice(webAudit.indexOf("jobs:") + 5).replace(/^\s*audit:/m, "  audit-web:");
-  const apiAuditJob = apiAudit.slice(apiAudit.indexOf("jobs:") + 5).replace(/^\s*audit:/m, "  audit-api:");
-  writeFileSync(".github/workflows/audit.yml",
+${ciWeb}
+${ciApi}
+`;
+  const audit =
 `# Non-blocking scheduled dependency audit — web/ (pnpm) + api/ (uv). Schedule-only (never a PR
 # check) so a new advisory can't freeze the runner's auto-merge; the merge gate is ci.yml.
 name: audit
@@ -400,8 +422,10 @@ permissions:
   contents: read
 
 jobs:
-${webAuditJob}
-${apiAuditJob}`);
+${auditWeb}
+${auditApi}
+`;
+  return { ci, audit };
 }
 
 // The CI gate ships with EVERY generated project (it's the merge gate, not a sandcastle
