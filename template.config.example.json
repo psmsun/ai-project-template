@@ -10,7 +10,7 @@
   "deployTarget": null,
   "sandcastle": {
     "enabled": false,
-    "mode": "no-sandbox"
+    "mode": "docker"
   },
   "codingStandards": {
     "source": "generated",

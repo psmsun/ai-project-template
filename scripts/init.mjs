@@ -56,6 +56,16 @@ function loadAnswers(path) {
     die(`only uv is encoded for Python (answers say ${a.packageManager})`);
   if (a.language === "both" && a.packageManager !== "pnpm+uv")
     die(`mixed-stack projects use packageManager "pnpm+uv" (answers say ${a.packageManager})`);
+  if (a.sandcastle?.enabled) {
+    // The runner/doctor templates assume Docker end-to-end (main.mts hardcodes docker(),
+    // the doctor requires the daemon + image). no-sandbox is unvalidated — backlog T3b.
+    if (a.sandcastle.mode !== "docker")
+      die(`sandcastle mode "${a.sandcastle.mode}" is not yet supported (backlog T3b) — use mode "docker" or disable sandcastle`);
+    // The container only sees repo-committed files: global skills are invisible to the
+    // in-container agent, so a global-skills sandcastle project would run skill-less.
+    if (a.skillLocation !== "project")
+      die(`sandcastle requires skillLocation "project" (answers say "${a.skillLocation}") — the Docker container only sees repo-committed skills`);
+  }
   a.dir = a.scaffoldLocation && a.scaffoldLocation !== "." ? a.scaffoldLocation : ".";
   return a;
 }
