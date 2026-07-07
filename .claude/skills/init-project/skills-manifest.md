@@ -1,8 +1,13 @@
 # Skills Manifest
 
-The workflow skills this template relies on, and where each comes from. `init-project` uses
-this to install skills **remote-first** (confirm each with the user, y/n), and leaves the
-vendored ones in place.
+The workflow skills this template relies on, and where each comes from.
+
+**What `scripts/init.mjs` installs automatically** (non-interactively, best-effort with `--copy -y`,
+only when `skillLocation: "project"`): `to-prd`, `handoff`, `grill-me` (from `mattpocock/skills`)
+and `writing-plans`, `executing-plans`, `verification-before-completion` (from `obra/superpowers`).
+The `--cleanup` self-check fails if any of these are missing, so a dead registry can't ship a
+skill-less project. The vendored skills (below) ship in-repo and need no install. Everything else in
+the tables below is an **optional manual `npx skills add`** — offer it, don't assume init added it.
 
 Install remote skills with **`--copy`** so `.claude/skills/<name>` contains real files (a
 self-contained repo), and **`-y`** to skip the CLI's own prompt (you've already asked the user):
@@ -21,12 +26,12 @@ mirror, which is git-ignored.
 
 ## Remote — confirmed available in `mattpocock/skills`
 
-| Skill         | Purpose in the workflow                                  |
-| ------------- | ------------------------------------------------------- |
-| `to-prd`      | Turn conversation/context into a PRD.                   |
-| `to-issues`   | PRD → independently-grabbable tracer-bullet issues.    |
-| `handoff`     | Compact context into a handoff doc for another agent.  |
-| `grill-me`    | Stress-test a plan/design by relentless questioning.   |
+| Skill         | Purpose in the workflow                                  | Auto-installed? |
+| ------------- | ------------------------------------------------------- | --------------- |
+| `to-prd`      | Turn conversation/context into a PRD.                   | yes             |
+| `handoff`     | Compact context into a handoff doc for another agent.  | yes             |
+| `grill-me`    | Stress-test a plan/design by relentless questioning.   | yes             |
+| `to-issues`   | PRD → tracer-bullet issues. Manual only — the vendored `prd-to-issues` is the default (pick one). | no |
 
 ### Remote — planning & verification (`obra/superpowers`)
 

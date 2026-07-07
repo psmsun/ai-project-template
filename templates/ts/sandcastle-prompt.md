@@ -32,6 +32,15 @@ blocked from merging by CI if these are red. This is a pnpm-managed TypeScript p
 
 If a run reports `ERR_PNPM_IGNORED_BUILDS`, run `pnpm approve-builds --all` once, then retry.
 
+# TRUST MODEL — READ THIS
+
+Your PR **auto-merges to `main` the moment CI is green — there is no human review.** The test
+suite is the ONLY thing standing between your code and production. So: write real tests for the
+behavior you add or change, and cover the failure paths, not just the happy one. Never weaken,
+skip, or delete a test to get a green run — a thin suite means weak code merges unattended.
+(Note: `pnpm approve-builds --all` auto-runs every dependency's install script; treat any new
+dependency as a supply-chain decision, not a free import.)
+
 # COMMIT
 
 Make a single git commit. The message must:

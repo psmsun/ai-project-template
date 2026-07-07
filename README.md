@@ -41,10 +41,11 @@ In Claude Code, run the **`init-project`** skill (e.g. say *“init the project�
    every validated gotcha baked in (TS: vitest, husky pre-commit, `~/*` alias, `allowBuilds`
    map, exact pnpm pin · Python: pydantic, ruff, mypy, pytest, pre-commit, `src/` layout ·
    both: `web/` + `api/` + root pre-commit), write the **CI gate** (`.github/workflows/ci.yml`,
-   matrix for mixed), install the workflow skills, optionally wire **sandcastle**
-   (Docker or no-sandbox, from `templates/<stack>/`), drop the **org overlay** (LICENSE,
-   CODEOWNERS, PR/issue templates, dependabot, CodeQL), and stamp `template.config.json`
-   with the template version + commit.
+   matrix for mixed) plus a non-blocking scheduled `audit.yml`, install the workflow skills
+   (only when `skillLocation: project` — `global` uses your global copies and skips in-repo
+   installs), optionally wire **sandcastle** (Docker; from `templates/<stack>/`), drop the
+   **org overlay** (LICENSE per your `org` + `license` choice, CODEOWNERS, PR/issue templates,
+   dependabot, CodeQL), and stamp `template.config.json` with the template version + commit.
 3. **Author `coding-standards`** (agent) — a per-project skill matching what was actually
    installed (or a close remote match from skills.sh).
 4. **Cleanup pass** (`node scripts/init.mjs .init-answers.json --cleanup`) — runs the real
@@ -58,7 +59,7 @@ The template wires up this loop end-to-end:
 | Stage             | Skill / tool                  | What it does                                               |
 | ----------------- | ----------------------------- | --------------------------------------------------------- |
 | 1. Spec           | `to-prd`                      | Turn a conversation/idea into a PRD.                      |
-| 2. Slice          | `prd-to-issues` / `to-issues` | Break the PRD into vertical tracer-bullet GitHub issues.  |
+| 2. Slice          | `prd-to-issues`               | Break the PRD into vertical tracer-bullet GitHub issues (vendored; `to-issues` is a manual remote alternative). |
 | 3. Autonomy (opt) | `.sandcastle/`                | Run an agent AFK over the AFK issues (Docker or local).   |
 | 4. Build          | `do-work`                     | Plan → implement (TDD for core) → typecheck+test → commit.|
 | 5. Handoff        | `handoff`                     | Compact context for the next session/agent.              |

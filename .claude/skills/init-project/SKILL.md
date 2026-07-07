@@ -97,10 +97,12 @@ node scripts/init.mjs .init-answers.json --cleanup
 ```
 
 This runs the project's real feedback loops (TS: typecheck + test + build · Python: ruff +
-mypy + pytest), verifies `coding-standards` exists, then removes the template meta
-(`init-project/`, `templates/`, the example config, `TEMPLATE-IMPROVEMENTS.md`, the init
-scripts, template-ci) and strips the bootstrap note from `CLAUDE.md`. **If the self-check
-fails, fix the cause and re-run — do NOT report success on a red check.**
+mypy + pytest), verifies `coding-standards` **and the auto-installed workflow skills** exist,
+then removes the template meta (`init-project/`, `templates/`, `template.config.example.json`,
+`TEMPLATE-IMPROVEMENTS.md`, `CHANGELOG.md`, `docs/superpowers/`, `scripts/init.mjs`,
+`scripts/validate-template.mjs`, `scripts/stamp-release.mjs`, `template-ci.yml`) and strips the
+bootstrap note from `CLAUDE.md`. **If the self-check fails, fix the cause and re-run — do NOT
+report success on a red check.**
 
 Then: commit the baseline and push to `main` (PR-per-issue branches off `origin/main`, so the
 scaffold + `.github/workflows/ci.yml` must be on `main` before the first AFK run — confirm the

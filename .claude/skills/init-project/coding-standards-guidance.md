@@ -198,3 +198,9 @@ When the project type is a library (e.g. `@scope/core`), the generated standards
   worktrees each hold a copy of `src/*.test.ts`; without an `exclude`, host `pnpm test` scans them
   and reports phantom failures. Generate `vitest.config.ts` with
   `test.exclude: [...configDefaults.exclude, "**/.sandcastle/**", "dist/**"]`.
+- **Trust model — make test rigor a first-class standard.** This template ships an AFK loop that
+  **auto-merges a PR to `main` the moment CI is green, with no human review**, and CI approves
+  every dependency's install script (`pnpm approve-builds --all` / unattended `uv sync`). So the
+  generated standards MUST require real tests for new behavior (including failure paths), forbid
+  weakening/skipping tests to go green, and treat adding a dependency as a supply-chain decision.
+  The test suite is the only gate between an agent's code and production — say so explicitly.
