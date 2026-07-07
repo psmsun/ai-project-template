@@ -4,6 +4,11 @@ Template versions. `init` stamps the current version + commit into the generated
 `template.config.json`, so you can always diff a project against the template revision it
 came from (see README → "Upgrading an existing project").
 
+<!-- template-commit: a47b4d87544ca65c45b067f2ed638b6498a67de8 -->
+<!-- ^ the template revision this CHANGELOG describes. `scripts/stamp-release.mjs` rewrites it
+     to HEAD at release time; `init` reads it (never the generated project's own git HEAD). -->
+
+
 ## [0.2.0] — 2026-07-02
 
 Template-upgrade epic (PRD #4): company-ready hardening.

@@ -586,8 +586,17 @@ jobs:
 
 function templateStamp() {
   let version = null, commit = null;
-  try { version = (readFileSync("CHANGELOG.md", "utf8").match(/^## \[([\d.]+)\]/m) || [])[1] || null; } catch {}
-  try { commit = out("git rev-parse HEAD"); } catch {}
+  try {
+    const cl = readFileSync("CHANGELOG.md", "utf8");
+    version = (cl.match(/^## \[([\d.]+)\]/m) || [])[1] || null;
+    // Commit comes from a COMMITTED marker the release process fills (scripts/stamp-release.mjs),
+    // NOT `git rev-parse HEAD`. init runs inside the generated project, whose HEAD is never a
+    // template revision — degit strips history, and "Use this template" mints a fresh initial
+    // commit — so stamping it would make the README upgrade-diff reference a commit that does
+    // not exist on the template. An unstamped marker (all zeros / absent) → null, never a guess.
+    const m = cl.match(/template-commit:\s*([0-9a-f]{7,40})/);
+    commit = m && !/^0+$/.test(m[1]) ? m[1] : null;
+  } catch {}
   return { version, commit };
 }
 
@@ -634,7 +643,7 @@ function selfCheck(a) {
 
 function cleanup(a, answersPath) {
   selfCheck(a);
-  for (const p of [".claude/skills/init-project", "templates", "template.config.example.json", "TEMPLATE-IMPROVEMENTS.md", "CHANGELOG.md", answersPath, "scripts/init.mjs", "scripts/validate-template.mjs"]) {
+  for (const p of [".claude/skills/init-project", "templates", "template.config.example.json", "TEMPLATE-IMPROVEMENTS.md", "CHANGELOG.md", answersPath, "scripts/init.mjs", "scripts/validate-template.mjs", "scripts/stamp-release.mjs"]) {
     rmSync(p, { recursive: true, force: true });
     log(`removed ${p}`);
   }

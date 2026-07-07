@@ -92,6 +92,9 @@ To pull template improvements into a project created earlier:
 1. Check `CHANGELOG.md` in this repo for what changed since your stamped version.
 2. Diff the relevant files against your stamped revision:
    `git clone https://github.com/psmsun/ai-project-template && cd ai-project-template && git diff <templateCommit>..main -- templates/ .claude/skills/`
+   `templateCommit` is a real revision on the template's `main` (stamped at release time — see
+   the `template-commit:` marker in `CHANGELOG.md`). If it's `null` (a template built before the
+   marker existed), diff by the `templateVersion` tag/date instead.
 3. Port what applies (usually `.sandcastle/` artifacts, `ci.yml`, and skills), then update the
    stamp in `template.config.json` to the new version/commit.
 
