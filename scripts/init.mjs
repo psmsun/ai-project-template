@@ -56,6 +56,16 @@ function loadAnswers(path) {
     die(`only uv is encoded for Python (answers say ${a.packageManager})`);
   if (a.language === "both" && a.packageManager !== "pnpm+uv")
     die(`mixed-stack projects use packageManager "pnpm+uv" (answers say ${a.packageManager})`);
+  if (a.sandcastle?.enabled) {
+    // The runner/doctor templates assume Docker end-to-end (main.mts hardcodes docker(),
+    // the doctor requires the daemon + image). no-sandbox is unvalidated — backlog T3b.
+    if (a.sandcastle.mode !== "docker")
+      die(`sandcastle mode "${a.sandcastle.mode}" is not yet supported (backlog T3b) — use mode "docker" or disable sandcastle`);
+    // The container only sees repo-committed files: global skills are invisible to the
+    // in-container agent, so a global-skills sandcastle project would run skill-less.
+    if (a.skillLocation !== "project")
+      die(`sandcastle requires skillLocation "project" (answers say "${a.skillLocation}") — the Docker container only sees repo-committed skills`);
+  }
   a.dir = a.scaffoldLocation && a.scaffoldLocation !== "." ? a.scaffoldLocation : ".";
   return a;
 }
@@ -373,6 +383,11 @@ function writeCiGate(a) {
 }
 
 // ---------------------------------------------------------------- skills
+// The remote workflow skills installSkills() is expected to land (installs are best-effort,
+// so both install time and the --cleanup self-check verify this set actually exists).
+const REMOTE_SKILLS = ["grill-me", "to-prd", "handoff", "writing-plans", "executing-plans", "verification-before-completion"];
+const missingSkills = () => REMOTE_SKILLS.filter((s) => !existsSync(`.claude/skills/${s}/SKILL.md`));
+
 function installSkills(a) {
   if (a.skillLocation !== "project") {
     log("skillLocation=global — skipping in-project installs (use global copies).");
@@ -381,6 +396,9 @@ function installSkills(a) {
   // remote skills with no vendored equivalent + the obra planning/verification trio
   run(`npx -y skills add mattpocock/skills -s grill-me -s to-prd -s handoff --copy -y`, { allowFail: true });
   run(`npx -y skills add obra/superpowers -s writing-plans -s executing-plans -s verification-before-completion --copy -y`, { allowFail: true });
+  const missing = missingSkills();
+  if (missing.length)
+    log(`WARNING: workflow skills missing after install: ${missing.join(", ")} — the skills registry may be unreachable. Re-run the two \`npx skills add\` commands above; --cleanup will FAIL until they exist.`);
 }
 
 // ---------------------------------------------------------------- sandcastle
@@ -561,6 +579,11 @@ function selfCheck(a) {
   else py(a.dir);
   if (!existsSync(".claude/skills/coding-standards/SKILL.md"))
     die("coding-standards skill missing — author it before --cleanup (see coding-standards-guidance.md).");
+  if (a.skillLocation === "project") {
+    const missing = missingSkills();
+    if (missing.length)
+      die(`workflow skills missing: ${missing.join(", ")} — re-run the \`npx skills add\` installs (see installSkills in this script) before --cleanup self-removes the retry path.`);
+  }
   log("self-check PASSED");
 }
 

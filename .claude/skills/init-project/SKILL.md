@@ -37,8 +37,8 @@ local-first?"). Ask one decision at a time:
 4. **Database** — `none` (default for libraries), `sqlite`, `postgres`.
 5. **Package manager** — `pnpm` (TS) / `uv` (Python). These are the encoded defaults; npm/yarn/poetry fall back to manual setup (rare — confirm the user really needs it).
 6. **Deploy target** — `docker`, `aws`, or `null` (recorded for the README; no action now).
-7. **Skill location** — `project` (committed, `--copy`; **required for sandcastle Docker runs** which only see repo-committed skills) or `global`. Default: `project`.
-8. **Sandcastle** — set up the AFK runner? `{ "enabled": true|false, "mode": "docker"|"no-sandbox" }`.
+7. **Skill location** — `project` (committed, `--copy`; **required for sandcastle runs** which only see repo-committed skills — the script rejects `global` + sandcastle) or `global`. Default: `project`.
+8. **Sandcastle** — set up the AFK runner? `{ "enabled": true|false, "mode": "docker" }`. Only Docker mode is validated; the script rejects `"no-sandbox"` until backlog T3b lands.
 
 ### 2. Write the answers file and run init
 
