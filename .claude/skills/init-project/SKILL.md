@@ -39,6 +39,7 @@ local-first?"). Ask one decision at a time:
 6. **Deploy target** — `docker`, `aws`, or `null` (recorded for the README; no action now).
 7. **Skill location** — `project` (committed, `--copy`; **required for sandcastle runs** which only see repo-committed skills — the script rejects `global` + sandcastle) or `global`. Default: `project`.
 8. **Sandcastle** — set up the AFK runner? `{ "enabled": true|false, "mode": "docker" }`. Only Docker mode is validated; the script rejects `"no-sandbox"` until backlog T3b lands.
+9. **Org & license** — `org`: the GitHub org/owner for `LICENSE` copyright + `CODEOWNERS` (e.g. `psmsun`). `license`: `proprietary` (default — "all rights reserved", scoped to `org`), `mit`, or `none` (ships no LICENSE file). Default the org to the repo's owner; confirm before stamping a proprietary license on a project that may be shared.
 
 ### 2. Write the answers file and run init
 
@@ -56,7 +57,9 @@ script validates the fields):
   "packageManager": "pnpm",
   "deployTarget": "docker",
   "sandcastle": { "enabled": true, "mode": "docker" },
-  "codingStandards": { "source": "generated", "remoteSlug": null }
+  "codingStandards": { "source": "generated", "remoteSlug": null },
+  "org": "psmsun",
+  "license": "proprietary"
 }
 ```
 
