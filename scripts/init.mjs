@@ -303,7 +303,12 @@ strict = true
         language: system
         pass_filenames: false
 `);
-  const pkgDir = readdirSync(at("src"))[0];
+  // `uv init --package` creates exactly one package dir under src/; pick it by directory,
+  // never by readdir order (a stray .DS_Store or hidden file would sort first and the smoke
+  // test would import garbage).
+  const pkgDir = readdirSync(at("src"), { withFileTypes: true })
+    .find((e) => e.isDirectory() && !e.name.startsWith("."))?.name;
+  if (!pkgDir) die(`no package directory under ${at("src")} — \`uv init --package\` should have created one`);
   mkdirSync(at("tests"), { recursive: true });
   if (!existsSync(at("tests/test_smoke.py")))
     writeFileSync(at("tests/test_smoke.py"),
